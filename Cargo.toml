@@ -1,0 +1,5 @@
+[package]
+license = "GNU LGPL"
+
+[workspace]
+members = ["parser"]
