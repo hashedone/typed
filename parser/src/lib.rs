@@ -3,6 +3,7 @@ use ast;
 mod literal;
 mod expression;
 mod definition;
+mod context;
 
 use nom::{
     self,
@@ -16,6 +17,8 @@ use nom::{
 use literal::literal;
 use expression::expression_with_defs;
 use definition::definition;
+
+use context::Context;
 
 /// Helper function for testing NOM combinators.
 /// Asserts if parser consumes whole string and
@@ -56,7 +59,7 @@ fn ident(s: &str) -> IResult<&str, String> {
 /// NOM combinator for parsing whole AST
 fn parse_ast(s: &str) -> IResult<&str, ast::AST> {
     map(
-        tuple((ws, expression_with_defs, ws)),
+        tuple((ws, expression_with_defs(&Default::default()), ws)),
         |(_, expr, _)| ast::AST::new(expr),
     )(s)
 }

@@ -5,6 +5,7 @@ use nom::{
     combinator::map,
     character::complete::multispace0 as ws,
 };
+use crate::Context;
 
 /// NOM combinator for single literal expression
 fn literal(s: &str) -> IResult<&str, ast::Expression> {
@@ -15,18 +16,27 @@ fn literal(s: &str) -> IResult<&str, ast::Expression> {
 }
 
 /// NOM combinator for any expression
-pub fn expression(s: &str) -> IResult<&str, ast::Expression> {
-    literal(s)
+pub fn expression(_ctx: &Context) ->
+    impl Fn(&str) -> IResult<&str, ast::Expression>
+{
+    literal
 }
 
 /// NOM combinator for expression with definitions in scope
-pub fn expression_with_defs(s: &str) ->
-    IResult<&str, ast::ExpressionWithDefs>
+pub fn expression_with_defs<'a>(ctx: &'a Context) ->
+    impl Fn(&str) -> IResult<&str, ast::ExpressionWithDefs> + 'a
 {
-    map(
-        tuple((separated_list(ws, crate::definition), ws, expression)),
-        |(defs, _, expr)| ast::ExpressionWithDefs::new(defs, expr)
-    )(s)
+    move |s| {
+        let (tail, (defs, _)) = tuple((
+            separated_list(ws, crate::definition(ctx)),
+            ws,
+        ))(s)?;
+
+        let ctx = ctx.extend(&defs);
+        let (tail, expr) = expression(&ctx)(tail)?;
+
+        Ok((tail, ast::ExpressionWithDefs::new(defs, expr)))
+    }
 }
 
 #[cfg(test)]
@@ -37,9 +47,9 @@ mod tests {
 
     #[test]
     fn parse_unit() {
-        test_parser(expression, &lit(unit()), "()");
+        test_parser(expression(&Default::default()), &lit(unit()), "()");
         test_parser(
-            expression_with_defs,
+            expression_with_defs(&Default::default()),
             &expr(None, lit(unit())),
             "()"
         );
@@ -48,7 +58,7 @@ mod tests {
     #[test]
     fn parse_defs() {
         test_parser(
-            expression_with_defs,
+            expression_with_defs(&Default::default()),
             &expr(
                 vec![def("singleton", expr(None, lit(unit())))],
                 lit(unit())
@@ -59,6 +69,6 @@ mod tests {
 
     #[test]
     fn parse_invalid() {
-        test_parser_fail(expression, "bad");
+        test_parser_fail(expression(&Default::default()), "bad");
     }
 }
