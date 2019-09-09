@@ -25,7 +25,7 @@ mod tests {
 
     #[test]
     fn parse_unit() {
-        test_parser(literal, unit(), "()");
+        test_parser(literal, &unit(), "()");
         test_parser_fail(literal, "( )");
         test_parser_fail(literal, "(\t)");
         test_parser_fail(literal, "(\n)");
