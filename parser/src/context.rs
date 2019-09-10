@@ -21,6 +21,13 @@ impl<'a> Context<'a> {
             defs,
         }
     }
+
+    pub fn find(&self, name: &str) -> Option<&'a Definition> {
+        self.defs
+            .iter()
+            .find(|def| def.name() == name)
+            .or_else(|| self.parent.clone().and_then(|ctx| ctx.find(name)))
+    }
 }
 
 impl<'a> Default for Context<'a> {
