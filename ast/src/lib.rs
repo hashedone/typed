@@ -11,6 +11,8 @@ pub enum Literal {
 pub enum Expression {
     /// Literal constant expression
     Literal(Literal),
+    /// Variable expression
+    Variable(String),
 }
 
 /// Function/variable definition

@@ -2,8 +2,9 @@ use nom::{
     IResult,
     sequence::tuple,
     multi::separated_list,
-    combinator::map,
+    combinator::{map, verify},
     character::complete::multispace0 as ws,
+    branch::alt,
 };
 use crate::Context;
 
@@ -15,11 +16,24 @@ fn literal(s: &str) -> IResult<&str, ast::Expression> {
     )(s)
 }
 
-/// NOM combinator for any expression
-pub fn expression(_ctx: &Context) ->
-    impl Fn(&str) -> IResult<&str, ast::Expression>
+/// NOM combinator for variable expression
+fn variable<'a>(ctx: &'a Context) ->
+    impl Fn(&str) -> IResult<&str, ast::Expression> + 'a
 {
-    literal
+    move |s| map(
+        verify(crate::ident, |id| ctx.find(id).is_some()),
+        |id| ast::Expression::Variable(id.into())
+    )(s)
+}
+
+/// NOM combinator for any expression
+pub fn expression<'a>(ctx: &'a Context) ->
+    impl Fn(&str) -> IResult<&str, ast::Expression> + 'a
+{
+    move |s| alt((
+        literal,
+        variable(ctx),
+    ))(s)
 }
 
 /// NOM combinator for expression with definitions in scope
@@ -41,9 +55,9 @@ pub fn expression_with_defs<'a>(ctx: &'a Context) ->
 
 #[cfg(test)]
 mod tests {
-    use crate::{test_parser, test_parser_fail};
+    use crate::{test_parser, test_parser_fail, Context};
     use super::{expression, expression_with_defs};
-    use ast::builder::{unit, lit, expr, def};
+    use ast::builder::{unit, lit, expr, def, var};
 
     #[test]
     fn parse_unit() {
@@ -53,6 +67,26 @@ mod tests {
             &expr(None, lit(unit())),
             "()"
         );
+    }
+
+    #[test]
+    fn parse_variable() {
+        let context = vec![def("var", expr(None, lit(unit())))];
+        let ctx = Context::new(&context[..]);
+        test_parser(expression(&ctx), &var("var"), "var");
+        test_parser(
+            expression_with_defs(&ctx),
+            &expr(None, var("var")),
+            "var"
+        );
+        test_parser(
+            expression_with_defs(&Default::default()),
+            &expr(
+                vec![def("var", expr(None, lit(unit())))],
+                var("var")
+            ),
+            "var = (); var"
+        )
     }
 
     #[test]
