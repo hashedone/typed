@@ -8,7 +8,7 @@ use nom::{
 fn unit(s: &str) -> IResult<&str, ast::Literal> {
     map(
         tag("()"),
-        |_| ast::Literal::Unit,
+        |_| ast::Literal::new(ast::Value::Unit),
     )(s)
 }
 

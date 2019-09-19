@@ -1,10 +1,44 @@
 pub mod builder;
 
+
+/// Type of any Typed expression
+#[derive(Debug, PartialEq)]
+pub enum Type {
+    /// Type
+    Type,
+    /// Single-value unit type
+    Unit,
+}
+
+/// Any value
+#[derive(Debug, PartialEq)]
+pub enum Value {
+    /// Unit value
+    Unit,
+}
+
+impl Value {
+    pub fn get_type(&self) -> Type {
+        match self {
+            Self::Unit => Type::Unit,
+        }
+    }
+}
+
 /// Literal constant
 #[derive(Debug, PartialEq)]
-pub enum Literal {
-    /// () in any value position
-    Unit,
+pub struct Literal {
+    value: Value,
+}
+
+impl Literal {
+    pub fn new(value: Value) -> Self {
+        Self { value }
+    }
+
+    pub fn value(&self) -> &Value {
+        &self.value
+    }
 }
 
 #[derive(Debug, PartialEq)]
