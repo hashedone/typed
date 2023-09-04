@@ -1,0 +1,6 @@
+let true = fn(a, b) {
+    let x = 5;
+    a
+};
+let id = fn(a) { a };
+true
