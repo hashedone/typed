@@ -1,5 +1,3 @@
-use std::{borrow::Cow, io::Write};
-
 use nom::{
     bytes::complete::tag,
     character::complete::{char as ch_, multispace0},
@@ -46,47 +44,17 @@ use super::{binding::Binding, expression::Expression, ident::ident};
 /// the final expression evaluation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FnDecl<'a> {
-    args: Vec<Cow<'a, str>>,
-    bindings: Vec<Binding<'a>>,
-    expr: Expression<'a>,
-}
-
-impl FnDecl<'static> {
-    pub fn new<Arg: ToString>(
-        args: impl IntoIterator<Item = Arg>,
-        bindings: impl IntoIterator<Item = Binding<'static>>,
-        expr: Expression<'static>,
-    ) -> Self {
-        Self {
-            args: args
-                .into_iter()
-                .map(|arg| Cow::Owned(arg.to_string()))
-                .collect(),
-            bindings: bindings.into_iter().collect(),
-            expr,
-        }
-    }
+    pub args: Vec<&'a str>,
+    pub bindings: Vec<Binding<'a>>,
+    pub expr: Expression<'a>,
 }
 
 impl<'a> FnDecl<'a> {
-    pub fn borrowed(
-        args: impl IntoIterator<Item = &'a str>,
-        bindings: impl IntoIterator<Item = Binding<'a>>,
-        expr: Expression<'a>,
-    ) -> Self {
-        Self {
-            args: args.into_iter().map(|arg| Cow::Borrowed(arg)).collect(),
-            bindings: bindings.into_iter().collect(),
-            expr,
-        }
-    }
-
     pub fn parse<E>(input: &'a str) -> IResult<&'a str, Self, E>
     where
         E: ParseError<&'a str>,
     {
-        let arg = map(ident, Cow::Borrowed);
-        let arg_list = separated_list1(tuple((multispace0, tag(","), multispace0)), arg);
+        let arg_list = separated_list1(tuple((multispace0, tag(","), multispace0)), ident);
         let bindings = separated_list0(multispace0, Binding::parse);
         let decl = tuple((
             tag("fn"),
@@ -114,38 +82,6 @@ impl<'a> FnDecl<'a> {
                 expr,
             },
         )(input)
-    }
-
-    pub fn into_owned(self) -> FnDecl<'static> {
-        let args = self
-            .args
-            .into_iter()
-            .map(|arg| Cow::Owned(arg.into_owned()))
-            .collect();
-        let bindings = self
-            .bindings
-            .into_iter()
-            .map(|binding| binding.into_owned())
-            .collect();
-        let expr = self.expr.into_owned();
-
-        FnDecl {
-            args,
-            bindings,
-            expr,
-        }
-    }
-
-    /// Pretty tree-like print
-    pub fn print_tree(&self, w: &mut impl Write, indent: usize) -> Result<(), std::io::Error> {
-        let args = self.args.join(" ");
-        write!(w, "{:indent$}fn ({args}):\n", "")?;
-
-        for binding in &self.bindings {
-            binding.print_tree(w, indent + 1)?;
-        }
-
-        self.expr.print_tree(w, indent + 1)
     }
 }
 

@@ -1,6 +1,3 @@
-use std::borrow::Cow;
-use std::io::Write;
-
 use nom::branch::alt;
 use nom::character::complete::{char as ch_, multispace0};
 use nom::combinator::map;
@@ -19,7 +16,7 @@ pub enum Expression<'a> {
     /// Literal value
     Literal(Literal),
     /// Variable
-    Variable(Cow<'a, str>),
+    Variable(&'a str),
     /// Function declaration
     ///
     /// Boxed, as it contains expression itself internally
@@ -30,24 +27,7 @@ pub enum Expression<'a> {
     FnAppl(Box<FnAppl<'a>>),
 }
 
-impl Expression<'static> {
-    /// Creates new literal expression
-    pub fn literal(literal: Literal) -> Self {
-        Expression::Literal(literal)
-    }
-
-    /// Creates new variable expression
-    pub fn variable(variable: String) -> Self {
-        Expression::Variable(Cow::Owned(variable))
-    }
-}
-
 impl<'a> Expression<'a> {
-    /// Creates new variable expression
-    pub fn variable_borrowed(variable: &'a str) -> Self {
-        Expression::Variable(Cow::Borrowed(variable))
-    }
-
     /// Nom parser for a trivial expression
     ///
     /// Trivial expression is any expression which is not left recursive. Any expression which
@@ -71,8 +51,7 @@ impl<'a> Expression<'a> {
         );
         let fn_decl = map(FnDecl::parse, |f| Expression::FnDecl(Box::new(f)));
         let literal = map(Literal::parse, Expression::Literal);
-        let variable = map(ident, |v| Expression::Variable(Cow::Borrowed(v)));
-        //        let fn_appl = map(FnAppl::parse, |f| Expression::FnAppl(Box::new(f)));
+        let variable = map(ident, |v| Expression::Variable(v));
         alt((paren, fn_decl, /* fn_appl, */ literal, variable))(input)
     }
 
@@ -83,26 +62,6 @@ impl<'a> Expression<'a> {
     {
         let fn_appl = map(FnAppl::parse, |f| Expression::FnAppl(Box::new(f)));
         alt((fn_appl, Self::parse_trivial))(input)
-    }
-
-    /// Returns an owned version of the expression
-    pub fn into_owned(self) -> Expression<'static> {
-        match self {
-            Expression::Literal(lit) => Expression::Literal(lit),
-            Expression::Variable(v) => Expression::Variable(Cow::Owned(v.into_owned())),
-            Expression::FnDecl(f) => Expression::FnDecl(Box::new(f.into_owned())),
-            Expression::FnAppl(f) => Expression::FnAppl(Box::new(f.into_owned())),
-        }
-    }
-
-    /// Pretty tree-like print
-    pub fn print_tree(&self, w: &mut impl Write, indent: usize) -> Result<(), std::io::Error> {
-        match self {
-            Expression::Literal(lit) => write!(w, "{:indent$}LIT: {lit}\n", ""),
-            Expression::Variable(v) => write!(w, "{:indent$}VAR: {v}\n", ""),
-            Expression::FnDecl(f) => f.print_tree(w, indent),
-            Expression::FnAppl(f) => f.print_tree(w, indent),
-        }
     }
 }
 
@@ -118,7 +77,7 @@ mod tests {
     fn variable() {
         let (tail, ex) = Expression::parse::<Err>("ident").finish().unwrap();
         assert_eq!(tail, "");
-        assert_eq!(ex, Expression::variable("ident".into()));
+        assert_eq!(ex, Expression::Variable("ident"));
     }
 
     #[test]

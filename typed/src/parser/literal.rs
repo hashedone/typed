@@ -7,7 +7,7 @@ use nom::error::ParseError;
 use nom::{character, IResult};
 
 /// Literal value
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Literal {
     /// Unit value, only value of an unit type
     Unit,

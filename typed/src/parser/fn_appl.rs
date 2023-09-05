@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use nom::{
     character::complete::{char as ch_, multispace0},
     combinator::map,
@@ -53,8 +51,8 @@ use super::expression::Expression;
 /// function is equivalent of the constant in functional paradigm.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FnAppl<'a> {
-    func: Expression<'a>,
-    args: Vec<Expression<'a>>,
+    pub func: Expression<'a>,
+    pub args: Vec<Expression<'a>>,
 }
 
 impl<'a> FnAppl<'a> {
@@ -87,30 +85,13 @@ impl<'a> FnAppl<'a> {
             |(func, _, _bro, _, args, _, _brc)| Self { func, args },
         )(input)
     }
-
-    pub fn into_owned(self) -> FnAppl<'static> {
-        FnAppl {
-            func: self.func.into_owned(),
-            args: self.args.into_iter().map(Expression::into_owned).collect(),
-        }
-    }
-
-    pub fn print_tree(&self, w: &mut impl Write, indent: usize) -> Result<(), std::io::Error> {
-        self.func.print_tree(w, indent)?;
-        write!(w, "{:indent$} <-\n", "", indent = indent)?;
-        for arg in &self.args {
-            arg.print_tree(w, indent + 1)?;
-        }
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use nom::Finish;
 
-    use crate::ast::literal::Literal;
+    use crate::parser::literal::Literal;
 
     use super::*;
 
