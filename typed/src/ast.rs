@@ -15,6 +15,7 @@ use nom::Finish;
 
 pub mod binding;
 pub mod expression;
+pub mod fn_appl;
 pub mod fn_decl;
 pub mod ident;
 pub mod literal;

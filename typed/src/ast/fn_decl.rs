@@ -2,7 +2,7 @@ use std::{borrow::Cow, io::Write};
 
 use nom::{
     bytes::complete::tag,
-    character::complete::multispace0,
+    character::complete::{char as ch_, multispace0},
     combinator::map,
     error::ParseError,
     multi::{separated_list0, separated_list1},
@@ -27,7 +27,7 @@ use super::{binding::Binding, expression::Expression, ident::ident};
 ///
 /// fn_decl <- "fn" "(" <fn_arg_list> ")" "{" <binding>* <expression> "}"
 /// fn_arg_list <- <fn_arg> | <fn_arg> "," <fn_arg_list>
-/// ident <- <ident>
+/// fn_arg <- <ident>
 ///
 /// In lambda calculus functions are taking only one arguments, which is how typed works -
 /// multi-argument functions are syntactic sugar for currying. Internally for structure
@@ -91,19 +91,19 @@ impl<'a> FnDecl<'a> {
         let decl = tuple((
             tag("fn"),
             multispace0,
-            nom::character::complete::char('('),
+            ch_('('),
             multispace0,
             arg_list,
             multispace0,
-            nom::character::complete::char(')'),
+            ch_(')'),
             multispace0,
-            nom::character::complete::char('{'),
+            ch_('{'),
             multispace0,
             bindings,
             multispace0,
             Expression::parse,
             multispace0,
-            nom::character::complete::char('}'),
+            ch_('}'),
         ));
 
         map(
