@@ -2,5 +2,25 @@ let true = fn(a, b) {
     a
 };
 let id = fn(a) { a };
-let something = true(15)((fn(x) { x })(10));
-true(15, id(10))
+let something = (true(15))((fn(x) { x })(10));
+let zero = fn(f, x) { x };
+let S = fn(n, fs, xs) { fs(n(fs, xs)) };
+let one = S(zero);
+let two = S(one);
+let three = S(two);
+
+let pair = fn(x, y, f) { f(x, y) };
+let fst = fn(p) { p(fn(x, y) { x }) };
+let scnd = fn(p) { p(fn(x, y) { y }) };
+
+let p = pair(a, b);
+
+let swp = fn(f, x, y) {
+    f(y, x)
+};
+
+let B = fn(f, g, x) {
+    f(g(x))
+};
+
+two

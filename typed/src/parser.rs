@@ -13,14 +13,10 @@ pub mod root;
 
 /// Description of Ast parsed from input. Lifetime is lifetime of the input.
 pub struct Ast<'a> {
-    root: Root<'a>,
+    pub root: Root<'a>,
 }
 
 impl<'a> Ast<'a> {
-    pub fn root(&self) -> &Root<'a> {
-        &self.root
-    }
-
     /// Parses an AST from a string
     pub fn parse(input: &'a str) -> Result<Self> {
         let (tail, root) = Root::parse(input)
