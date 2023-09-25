@@ -1,13 +1,13 @@
 use crate::parser::fn_decl::FnDecl as ParsedDecl;
 
-use super::{expression::Expression, BuildingContext, Context};
+use super::{expression::Expression, BuildingContext, Context, ExprId};
 
 use anyhow::{anyhow, Result};
 
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct FnDecl {
     pub arg: usize,
-    pub expr: Expression,
+    pub expr: ExprId,
 }
 
 impl FnDecl {
@@ -28,7 +28,8 @@ impl FnDecl {
             .into_iter()
             .map(|arg| {
                 let var = context.create_variable(arg);
-                builder.bind(arg, Expression::Variable(var));
+                let expr = context.create_expr(Expression::Variable(var));
+                builder.bind(arg, expr);
                 var
             })
             .collect();
@@ -45,7 +46,7 @@ impl FnDecl {
 
         let decl = args.into_iter().rev().fold(decl, |expr, arg| FnDecl {
             arg,
-            expr: Expression::FnDecl(Box::new(expr)),
+            expr: context.create_expr(Expression::FnDecl(expr)),
         });
 
         Ok(decl)

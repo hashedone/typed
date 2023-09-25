@@ -8,6 +8,7 @@ let S = fn(n, fs, xs) { fs(n(fs, xs)) };
 let one = S(zero);
 let two = S(one);
 let three = S(two);
+let M = fn(a) { a(a) };
 
 let pair = fn(x, y, f) { f(x, y) };
 let fst = fn(p) { p(fn(x, y) { x }) };
@@ -23,4 +24,12 @@ let B = fn(f, g, x) {
     f(g(x))
 };
 
-two
+let Y = fn(f) {
+    let sub = fn(x) {
+        f(x(x))
+    };
+
+    sub(sub)
+};
+
+Y

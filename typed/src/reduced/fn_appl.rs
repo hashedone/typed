@@ -1,7 +1,7 @@
-use super::expression::Expression;
+use super::ExprId;
 
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct FnAppl {
-    pub func: Expression,
-    pub arg: Expression,
+    pub func: ExprId,
+    pub arg: ExprId,
 }

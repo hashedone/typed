@@ -2,7 +2,7 @@ use std::{borrow::Cow, fmt::Display};
 
 use crate::parser::root::Root;
 
-use self::expression::Expression;
+use self::expression::{Expression, PrettyExpression};
 
 use anyhow::{anyhow, Result};
 
@@ -15,10 +15,21 @@ pub mod fn_decl;
 /// Contains common reduced nodes
 #[derive(Debug, Clone, PartialEq, Hash, Eq, Default)]
 pub struct Context<'a> {
+    /// Literals in the
     /// Variables in the reduced tree as kept as `usize` to simplify processing, but here is the
     /// mapping of those variables to their names in the original source.
     variables: Vec<Cow<'a, str>>,
+
+    /// Expression nodes in the tree.
+    expressions: Vec<Expression>,
 }
+
+/// Epxression id of expression node.
+///
+/// Nodes are increasing only - if the node is created once, it will never be removed untill the
+/// tree is purged, so it is always safe to use indicies passed as `ExprId`.
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
+pub struct ExprId(usize);
 
 impl<'a> Context<'a> {
     fn create_variable(&mut self, var: impl Into<Cow<'a, str>>) -> usize {
@@ -37,6 +48,33 @@ impl<'a> Context<'a> {
             .map_or_else(|| format!("_{var}"), |name| format!("{name}"));
         self.create_variable(name)
     }
+
+    /// Adds an expression node, returning its id
+    fn create_expr(&mut self, expr: Expression) -> ExprId {
+        self.expressions.push(expr);
+        ExprId(self.expressions.len() - 1)
+    }
+
+    /// Clones expression returning its new index
+    fn clone_expr(&mut self, expr: ExprId) -> ExprId {
+        let expr = self.expr(expr).clone();
+        self.expressions.push(expr);
+        ExprId(self.expressions.len() - 1)
+    }
+
+    /// Returns node of given id
+    fn expr(&self, ExprId(id): ExprId) -> Expression {
+        unsafe { *self.expressions.get_unchecked(id) }
+    }
+
+    fn expr_mut(&mut self, ExprId(id): ExprId) -> &mut Expression {
+        unsafe { self.expressions.get_unchecked_mut(id) }
+    }
+
+    /// Formatted, print-friendly expression string
+    fn pexpr(&self, id: ExprId) -> PrettyExpression {
+        self.expr(id).p(self)
+    }
 }
 
 /// The context used to build the reduced tree
@@ -47,7 +85,9 @@ struct BuildingContext<'a> {
     /// This is not a `HashMap`, because single name might be bound multiple times, new binding
     /// should shadow the previous occurence - therefore bindings are in the form of the stack,
     /// and when binding is looked up, it should always be scanned from the end.
-    bindings: Vec<(&'a str, Expression)>,
+    ///
+    /// Expressions are kept as their `ExprId` in the context
+    bindings: Vec<(&'a str, ExprId)>,
     /// Stack frames in which bindings are introduced. Whenever new scope is created, the new stack
     /// frame should be introduced, and when the scope is processed, the stack frame should be
     /// closed - this way, all the bindings introduced in this frame would immediately be removes.
@@ -72,7 +112,7 @@ impl<'a> BuildingContext<'a> {
     }
 
     /// Returns an expression bound to the variable
-    pub fn binding(&self, var: &str) -> Result<Expression> {
+    pub fn binding(&self, var: &str) -> Result<ExprId> {
         self.bindings
             .iter()
             .rev()
@@ -82,7 +122,7 @@ impl<'a> BuildingContext<'a> {
     }
 
     /// Create new binding
-    pub fn bind(&mut self, var: &'a str, expr: Expression) {
+    pub fn bind(&mut self, var: &'a str, expr: ExprId) {
         self.bindings.push((var, expr))
     }
 }
@@ -91,7 +131,7 @@ impl<'a> BuildingContext<'a> {
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub struct Ast<'a> {
     pub context: Context<'a>,
-    pub root: Expression,
+    pub root: ExprId,
 }
 
 impl<'a> Ast<'a> {
@@ -107,6 +147,7 @@ impl<'a> Ast<'a> {
 
 impl Display for Ast<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.root.format(f, &self.context)
+        let root = self.context.expr(self.root);
+        root.format(f, &self.context)
     }
 }
