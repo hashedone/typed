@@ -72,7 +72,7 @@ impl Expression {
 
     /// Performes single alfa reduction of all the non-free variables occuring in the expression to
     /// the newly created variables, creating a new expression from it.
-    #[instrument(name = "alfa", skip(context))]
+    #[instrument(name = "α", skip(context))]
     fn alfa_conversion(expr: ExprId, context: &mut Context<'_>) -> ExprId {
         // Mappings to be performed in the `(from, to)` form
         //
@@ -131,13 +131,14 @@ impl Expression {
     ///
     /// Alfa-conversion is performed only when expression is branched to keep unique variables in
     /// the entire tree.
-    #[instrument(skip(context))]
+    #[instrument(name = "β", skip(context))]
     fn reduce(id: ExprId, context: &mut Context<'_>) -> ExprId {
         use Expression::*;
 
         let result = context.clone_expr(id);
         // Application nodes occured in the process - they shall be double-checked after the proces
-        // as reduceable node could be created
+        // as reduceable node could be created. Initialized with the root node as it is first to be
+        // verified.
         let mut applications = vec![result];
 
         // Expressions substitutions to be performed, pairs of `(var, expr_id)`
@@ -150,73 +151,106 @@ impl Expression {
             // Reducing only if top-level expression is `(\x.e1) e2`
             // `appl` becomes `(\x.e1) e2
             // `decl` becomes `\x.e1`
-            let FnAppl(mut appl) = context.expr(root) else { continue };
-            let FnDecl(decl) = context.expr(appl.func) else { continue };
+            let FnAppl(appl) = context.expr(root) else { 
+                debug!(expr = %context.pexpr(root), "Non-reduceable");
+                continue
+            };
+
+            let FnDecl(decl) = context.expr(appl.func) else {
+                debug!(expr = %context.pexpr(root), "Non-reduceable");
+                continue
+            };
 
             // Recursion check
             //
-            // The node shaped as `(e1 e1)` where `e1` is a function declaration node, leading to
-            // the infite recursion. We still want to reduce the `e1` node, but without reducing
-            // top-level expression.
-            if Self::equivalent(appl.func, appl.arg, context) {
-                debug!(expr = %context.pexpr(root), "β-conversion recursion");
-                applications.push(appl.func);
-                if appl.arg != appl.func {
-                    appl.arg = appl.func;
-                    *context.expr_mut(root) = FnAppl(appl);
-                }
+            // The node shaped as `(\x.e1) (\x.e1)` , leading to the recursion. We still want to reduce the
+            // `e1` node, but without reducing top-level expression.
+            //
+            // We also use the same node as a reference to `(\x.e1)` to simplify further processing
+            // if Self::equivalent(appl.func, appl.arg, context) {
+            //     debug!(expr = %context.pexpr(root), "recursion");
+            //     applications.push(appl.func);
 
-                continue;
-            }
+            //     if appl.arg != appl.func {
+            //         appl.arg = appl.func;
+            //         *context.expr_mut(root) = FnAppl(appl);
+            //     }
 
-            debug!(expr = %context.pexpr(root), "β-conversion");
+            //     continue;
+            // }
+
+            debug!(
+                var = %context.variable(decl.arg),
+                sub = %context.pexpr(appl.arg),
+                expr = %context.pexpr(decl.expr),
+                "substitution"
+            );
 
             substitutions.clear();
-            substitutions.push((decl.arg, context.expr(appl.arg).clone()));
+            substitutions.push((decl.arg, context.expr(appl.arg)));
 
-            let expr = context.expr(decl.expr).clone();
+            let expr = context.expr(decl.expr);
             *context.expr_mut(root) = expr;
             stack.push((root, substitutions.len()));
 
             while let Some((id, depth)) = stack.pop() {
                 substitutions.shrink_to(depth);
 
-                let expr = context.expr(id).clone();
-                let expr = match expr {
+                let expr = match context.expr(id) {
+                    // Literal expressions are not reduced
                     Literal(_) => expr,
-                    Variable(var) => {
-                        if let Some((_, to)) =
-                            substitutions.iter().rev().find(|(from, _)| *from == var)
-                        {
-                            to.clone()
-                        } else {
-                            expr
-                        }
-                    }
+
+                    // Variables expresions are substituted if they are in substitution stack
+                    Variable(var) => substitutions
+                        .iter()
+                        .rev()
+                        .find(|(from, _)| *from == var)
+                        .map(|(_, to)| *to)
+                        .unwrap_or(expr),
+
+                    // Function declarations have their expression reduced
                     FnDecl(mut decl) => {
                         decl.expr = context.clone_expr(decl.expr);
                         stack.push((decl.expr, substitutions.len()));
                         FnDecl(decl)
                     }
+
+                    // Function declarations are reduced in two ways
+                    //
+                    // * Applications in forma of (\x.e1) e2 - those are immediately reduced to
+                    //   `e1` with `z` substituted with `e2`
+                    // * Other applications have reduced both sides of application, and scheduled
+                    //   for later recheck, as the reduction might end up in creating reduceable
+                    //   node
                     FnAppl(mut appl) => {
                         if let FnDecl(decl) = context.expr(appl.func) {
                             // Immediately reduceable expression
-                            //
-                            // Recursion check - we do not reduce if expresions are the same
-                            // TODO: Double check it its enough, possibly its neccessary if the
-                            // `appl.arg` is anywhere down in `appl.func`
-                            //
-                            // If recursion is found, we do not reduce this node, but we reduce the
-                            // underlying expression
-                            if Self::equivalent(appl.func, appl.arg, context) {
-                                debug!(expr = %expr.p(context), "β-conversion recursion");
-                                appl.func = context.clone_expr(appl.arg);
-                                appl.arg = appl.func;
+                            //if Self::equivalent(appl.func, appl.arg, context) {
+                            //    // Recursion check - we do not reduce if expresions are the same
+                            //    // TODO: Double check it its enough, possibly its neccessary if the
+                            //    // `appl.arg` is anywhere down in `appl.func`
+                            //    //
+                            //    // If recursion is found, we do not reduce this node, but we reduce the
+                            //    // underlying expression
 
-                                stack.push((appl.func, substitutions.len()));
+                            //    debug!(expr = %expr.p(context), "recursion");
+                            //    appl.func = context.clone_expr(appl.func);
+                            //    appl.arg = appl.func;
 
-                                FnAppl(appl)
-                            } else {
+                            //    stack.push((appl.func, substitutions.len()));
+
+                            //    FnAppl(appl)
+                            //} else {
+                                debug!(
+                                    var = %context.variable(decl.arg),
+                                    sub = %context.pexpr(appl.arg),
+                                    expr = %context.pexpr(decl.expr),
+                                    "substitution"
+                                );
+
+                                // Substitution is first alpha-converted to make sure there are no
+                                // variables colusions when applying substitution ito the
+                                // expression when reduction is performed
                                 let substitution = Self::alfa_conversion(appl.arg, context);
                                 let substitution = context.expr(substitution);
                                 substitutions.push((decl.arg, substitution));
@@ -225,7 +259,7 @@ impl Expression {
                                 stack.push((id, substitutions.len()));
 
                                 context.expr(decl.expr)
-                            }
+                            //}
                         } else {
                             appl.func = context.clone_expr(appl.func);
                             stack.push((appl.func, substitutions.len()));
@@ -233,6 +267,9 @@ impl Expression {
                             appl.arg = context.clone_expr(appl.arg);
                             stack.push((appl.arg, substitutions.len()));
 
+                            // After the whole conversion we need to reconsider this node, as if
+                            // `arg.func` would reduce to the function declaration after reduction,
+                            // the reduceable node is creted
                             applications.push(id);
 
                             FnAppl(appl)
@@ -240,10 +277,9 @@ impl Expression {
                     }
                 };
 
+                debug!(from = %context.pexpr(id), to = %expr.p(context), "reduced");
                 *context.expr_mut(id) = expr;
             }
-
-            debug!(expr = %context.pexpr(root), "β-conversion complete");
         }
 
         result
@@ -281,10 +317,8 @@ impl Expression {
 
     pub(super) fn format(&self, w: &mut std::fmt::Formatter, ctx: &Context) -> std::fmt::Result {
         match self {
-            Self::Variable(v) => ctx
-                .variable(*v)
-                .map(|v| write!(w, "{v}"))
-                .unwrap_or_else(|| write!(w, "_{v}")),
+            Self::Variable(v) => write!(w, "{}", ctx
+                .variable(*v)),
             Self::Literal(lit) => write!(w, "{lit}"),
             Self::FnAppl(appl) => {
                 write!(w, "(")?;
@@ -294,9 +328,7 @@ impl Expression {
                 write!(w, ")")
             }
             Self::FnDecl(decl) => {
-                ctx.variable(decl.arg)
-                    .map(|v| write!(w, "\\{v}. "))
-                    .unwrap_or_else(|| write!(w, "\\_{}", decl.arg))?;
+                write!(w, "\\{}. ", ctx.variable(decl.arg))?;
                 ctx.expr(decl.expr).format(w, ctx)
             }
         }

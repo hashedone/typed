@@ -37,15 +37,24 @@ impl<'a> Context<'a> {
         self.variables.len() - 1
     }
 
-    fn variable(&self, id: usize) -> Option<&str> {
-        self.variables.get(id).map(Cow::as_ref)
+    /// Return variable name
+    ///
+    /// Variables which are not mapped to any name are returned as `_id`
+    fn variable(&self, id: usize) -> Cow<'_, str> {
+        self.variables
+            .get(id)
+            .map(|name| Cow::Borrowed(name.as_ref()))
+            .unwrap_or_else(|| Cow::Owned(format!("_{id}")))
     }
 
     /// Creates a new variable, with debug information derived from the given variable
     fn duplicate_variable(&mut self, var: usize) -> usize {
         let name = self
-            .variable(var)
-            .map_or_else(|| format!("_{var}"), |name| format!("{name}"));
+            .variables
+            .get(var)
+            .cloned()
+            .unwrap_or_else(|| Cow::Owned(format!("_{var}")));
+
         self.create_variable(name)
     }
 

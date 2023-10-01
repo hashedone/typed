@@ -32,4 +32,4 @@ let Y = fn(f) {
     sub(sub)
 };
 
-Y
+something

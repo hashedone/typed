@@ -26,7 +26,7 @@ fn main() {
         }
     };
 
-    // print_parsed_tree(&mut std::io::stdout(), ast.root()).unwrap();
+    //    print_parsed_tree(&mut std::io::stdout(), ast.root()).unwrap();
     let reduced = reduced::Ast::new(ast.root).unwrap();
     println!("{reduced}");
 }

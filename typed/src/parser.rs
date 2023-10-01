@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{anyhow, ensure, Context, Result};
 use nom::{error::convert_error, Finish};
 
