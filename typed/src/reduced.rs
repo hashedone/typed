@@ -66,7 +66,7 @@ impl<'a> Context<'a> {
 
     /// Clones expression returning its new index
     fn clone_expr(&mut self, expr: ExprId) -> ExprId {
-        let expr = self.expr(expr).clone();
+        let expr = self.expr(expr);
         self.expressions.push(expr);
         ExprId(self.expressions.len() - 1)
     }
