@@ -1,32 +1,21 @@
 use std::io::stdin;
 
+use color_eyre::Result;
+use eyre::Context;
 use nom_locate::LocatedSpan;
 use tracing::info;
-use tracing_subscriber::filter::EnvFilter;
+use tracing_subscriber::EnvFilter;
 
-mod mir;
-pub mod parser;
-pub mod reduced;
-mod tree_printer;
-
-fn main() {
-    dotenv::dotenv().unwrap();
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    dotenv::dotenv().wrap_err("Dotenv setup")?;
     let filter = EnvFilter::from_default_env();
     tracing_subscriber::fmt().with_env_filter(filter).init();
     info!("Logging initialized");
-    let source: Vec<_> = stdin().lines().filter_map(Result::ok).collect();
+
+    let source: Vec<_> = stdin().lines().map_while(Result::ok).collect();
     let source: String = source.join("\n");
-    let source = LocatedSpan::new(source);
+    let _source = LocatedSpan::new(source);
 
-    let ast = match parser::Ast::parse_verbose(&source) {
-        Ok(ast) => ast,
-        Err(err) => {
-            println!("{err:?}");
-            return;
-        }
-    };
-
-    //    print_parsed_tree(&mut std::io::stdout(), ast.root()).unwrap();
-    let reduced = reduced::Ast::new(ast.root).unwrap();
-    println!("{reduced}");
+    Ok(())
 }
