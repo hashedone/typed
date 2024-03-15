@@ -31,8 +31,6 @@ fn main() -> Result<()> {
     let source = std::fs::read_to_string(&args.input).wrap_err("Reading input file")?;
     let source = LocatedSpan::new(source.as_str());
 
-    println!("Source: {:?}", source);
-
     let module = match Module::parse(source) {
         Err(err) => {
             let err = err
@@ -52,7 +50,8 @@ fn main() -> Result<()> {
         Ok(module) => module,
     };
 
-    println!("Compiled module: {:?}", module);
+    println!("Compiled module:");
+    module.format(&mut std::io::stdout().lock()).unwrap();
 
     Ok(())
 }

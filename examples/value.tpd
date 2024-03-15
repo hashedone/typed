@@ -1,1 +1,2 @@
 pub let variable: u32 = 15;
+let other = 10;

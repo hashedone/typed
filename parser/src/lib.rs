@@ -34,6 +34,20 @@ impl<'a> Module<'a> {
             .finish()
             .map(|(_, this)| this)
     }
+
+    pub fn format(&self, f: &mut impl std::io::Write) -> std::io::Result<()> {
+        self.format_impl(f, 0)
+    }
+
+    fn format_impl(&self, f: &mut impl std::io::Write, ind: usize) -> std::io::Result<()> {
+        writeln!(f, "MOD")?;
+
+        for bind in &self.bindings {
+            bind.format(f, ind + 1)?;
+        }
+
+        Ok(())
+    }
 }
 
 /// Binging in form of:
@@ -76,6 +90,23 @@ impl<'a> Binding<'a> {
             },
         )(input)
     }
+
+    fn format(&self, f: &mut impl std::io::Write, ind: usize) -> std::io::Result<()> {
+        writeln!(
+            f,
+            "{:indent$}BIND ({:?}) {}:",
+            "",
+            self.visibility,
+            self.name,
+            indent = ind
+        )?;
+
+        if let Some(ty_) = &self.ty_ {
+            ty_.format(f, ind + 1)?;
+        }
+
+        self.expression.format(f, ind + 1)
+    }
 }
 
 #[derive(Debug)]
@@ -86,6 +117,15 @@ pub enum Expression<'a> {
 impl<'a> Expression<'a> {
     fn parse(input: Input<'a>) -> IResult<Self> {
         map(ExpressionLiteral::parse, Expression::Literal)(input)
+    }
+
+    fn format(&self, f: &mut impl std::io::Write, ind: usize) -> std::io::Result<()> {
+        match self {
+            Self::Literal(lit) => {
+                write!(f, "{:indent$}EXPR ", "", indent = ind)?;
+                lit.format(f)
+            }
+        }
     }
 }
 
@@ -101,6 +141,12 @@ impl<'a> ExpressionLiteral<'a> {
         let literal = tuple((sign, multispace0, digit1));
         let literal = context("Integral literal", literal);
         map(recognize(literal), ExpressionLiteral::Integral)(input)
+    }
+
+    fn format(&self, f: &mut impl std::io::Write) -> std::io::Result<()> {
+        match self {
+            Self::Integral(lit) => writeln!(f, "{}", lit),
+        }
     }
 }
 
@@ -141,6 +187,14 @@ pub enum Type {
 impl Type {
     fn parse(input: Input) -> IResult<Self> {
         context("Type", map(BasicType::parse, Type::Basic))(input)
+    }
+
+    fn format(&self, f: &mut impl std::io::Write, ind: usize) -> std::io::Result<()> {
+        match self {
+            Self::Basic(ty_) => {
+                writeln!(f, "{:indent$}TY {:?}", "", ty_, indent = ind)
+            }
+        }
     }
 }
 
