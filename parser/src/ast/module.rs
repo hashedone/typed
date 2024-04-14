@@ -5,7 +5,8 @@ use nom::multi::many0;
 use nom::sequence::{preceded, terminated};
 use nom_locate::LocatedSpan;
 
-use crate::{make_node, BindingNode, Describe, IResult, Meta};
+use super::binding::BindingNode;
+use super::{make_node, Describe, IResult, Meta};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module<'a, M> {
@@ -53,11 +54,9 @@ make_node!(Module<'a, M> => ModuleNode<'a, M>);
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        binding::Binding,
-        expression::{Expression, ExpressionLiteral},
-        vis::Visibility,
-    };
+    use crate::ast::binding::Binding;
+    use crate::ast::expression::{Expression, ExpressionLiteral};
+    use crate::ast::vis::Visibility;
 
     use super::*;
 

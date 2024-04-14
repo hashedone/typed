@@ -2,7 +2,7 @@ use nom::bytes::complete::tag;
 use nom::combinator::{map, value};
 use nom::error::context;
 
-use crate::{make_node, Describe, IResult, Input};
+use super::{make_node, Describe, IResult, Input};
 
 /// Built-in type: `u32`
 #[derive(Debug, Clone, Copy, PartialEq)]

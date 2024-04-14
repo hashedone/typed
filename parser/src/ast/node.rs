@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use nom::{combinator::map, Parser};
 
-use crate::{Describe, Error, Input, Meta};
+use super::{Describe, Error, Input, Meta};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Node<T, M> {

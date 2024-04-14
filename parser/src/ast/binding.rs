@@ -4,9 +4,10 @@ use nom::combinator::{map, opt};
 use nom::error::context;
 use nom::sequence::tuple;
 
-use crate::{
-    make_node, parse_id, Describe, ExpressionNode, IResult, Input, Meta, TypeNode, VisibilityNode,
-};
+use super::expression::ExpressionNode;
+use super::ty::TypeNode;
+use super::vis::VisibilityNode;
+use super::{make_node, parse_id, Describe, IResult, Input, Meta};
 
 /// Binging in form of:
 /// `[visibility] let name [: type] = expression;`
@@ -65,6 +66,14 @@ where
             },
         )(input.into())
     }
+
+    pub fn expression(&self) -> &ExpressionNode<'a, M> {
+        &self.expression
+    }
+
+    pub fn expression_mut(&mut self) -> &mut ExpressionNode<'a, M> {
+        &mut self.expression
+    }
 }
 
 impl<'a, M, W> Describe<W> for Binding<'a, M>
@@ -89,9 +98,9 @@ make_node!(Binding<'a, M> => BindingNode<'a, M>);
 
 #[cfg(test)]
 mod tests {
-    use crate::expression::{Expression, ExpressionLiteral};
-    use crate::ty::{BasicType, Type};
-    use crate::vis::Visibility;
+    use crate::ast::expression::{Expression, ExpressionLiteral};
+    use crate::ast::ty::{BasicType, Type};
+    use crate::ast::vis::Visibility;
 
     use super::*;
 

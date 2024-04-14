@@ -4,7 +4,7 @@ use nom::error::context;
 use nom::sequence::tuple;
 use nom_locate::LocatedSpan;
 
-use crate::{make_node, Describe, IResult, Input};
+use super::{make_node, Describe, IResult, Input};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Expression<'a> {
@@ -12,7 +12,7 @@ pub enum Expression<'a> {
 }
 
 impl<'a> Expression<'a> {
-    fn parse(input: impl Into<LocatedSpan<&'a str>>) -> IResult<'a, Self> {
+    fn parse(input: impl Into<Input<'a>>) -> IResult<'a, Self> {
         map(ExpressionLiteral::parse, Expression::Literal)(input.into())
     }
 }

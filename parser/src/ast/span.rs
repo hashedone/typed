@@ -1,7 +1,7 @@
 use nom::{sequence::tuple, Parser};
 use nom_locate::position;
 
-use crate::{Error, Input, Meta};
+use super::{Error, Input, Meta};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Span {

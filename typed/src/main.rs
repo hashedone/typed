@@ -7,7 +7,7 @@ use nom::error::convert_error;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-use parser::RawAST;
+use parser::ast::Raw as Ast;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -29,7 +29,7 @@ fn main() -> Result<()> {
 
     let source = std::fs::read_to_string(&args.input).wrap_err("Reading input file")?;
 
-    let module = match RawAST::parse(&source) {
+    let module = match Ast::parse(&source) {
         Err(err) => {
             let err: Vec<_> = err
                 .errors

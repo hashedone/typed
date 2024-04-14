@@ -4,7 +4,7 @@ use nom::combinator::{map, opt, value};
 use nom::error::context;
 use nom::sequence::terminated;
 
-use crate::{make_node, Describe, IResult, Input};
+use super::{make_node, Describe, IResult, Input};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Visibility {
