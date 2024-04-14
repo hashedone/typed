@@ -4,11 +4,10 @@ use clap::Parser;
 use color_eyre::Result;
 use eyre::Context;
 use nom::error::convert_error;
-use nom_locate::LocatedSpan;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-use parser::Module;
+use parser::RawAST;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -29,20 +28,19 @@ fn main() -> Result<()> {
     info!("Logging initialized");
 
     let source = std::fs::read_to_string(&args.input).wrap_err("Reading input file")?;
-    let source = LocatedSpan::new(source.as_str());
 
-    let module = match Module::parse(source) {
+    let module = match RawAST::parse(&source) {
         Err(err) => {
-            let err = err
+            let err: Vec<_> = err
                 .errors
                 .into_iter()
                 .map(|(input, error)| (*input.fragment(), error))
                 .collect();
 
-            println!(
+            print!(
                 "While compiling {}:\n{}",
                 args.input.to_string_lossy(),
-                convert_error(*source.fragment(), nom::error::VerboseError { errors: err })
+                convert_error(source.as_str(), nom::error::VerboseError { errors: err })
             );
 
             return Ok(());
