@@ -3,33 +3,33 @@ use nom::combinator::{cut, eof, map, not};
 use nom::error::context;
 use nom::multi::many0;
 use nom::sequence::{preceded, terminated};
-use nom_locate::LocatedSpan;
 
 use super::binding::BindingNode;
-use super::{make_node, Describe, IResult, Meta};
+use super::node::Node;
+use super::{Describe, IResult, Input, Meta, MetaNode};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Module<'a, M> {
-    bindings: Vec<BindingNode<'a, M>>,
+pub struct Module<'a, M = ()> {
+    pub bindings: Vec<BindingNode<'a, M>>,
 }
 
-impl<'a, M> Module<'a, M>
+impl<'a, M> Node<'a> for Module<'a, M>
 where
     M: Meta + 'a,
 {
-    pub fn new(bidnings: impl IntoIterator<Item = BindingNode<'a, M>>) -> Self {
-        Self {
-            bindings: bidnings.into_iter().collect(),
-        }
-    }
-
-    fn parse(input: impl Into<LocatedSpan<&'a str>>) -> IResult<'a, Self> {
-        let binding = preceded(not(eof), cut(BindingNode::parse));
+    fn parser(input: Input<'a>) -> IResult<Self> {
+        let binding = preceded(not(eof), cut(BindingNode::parser));
         let binding = preceded(multispace0, binding);
         let bindings = many0(binding);
         let bindings = terminated(bindings, multispace0);
 
-        context("Module", map(bindings, |bindings| Self { bindings }))(input.into())
+        context("Module", map(bindings, |bindings| Self { bindings }))(input)
+    }
+}
+
+impl<'a> Module<'a, ()> {
+    pub fn meta(self) -> ModuleNode<'a, ()> {
+        self.into()
     }
 }
 
@@ -50,7 +50,7 @@ where
     }
 }
 
-make_node!(Module<'a, M> => ModuleNode<'a, M>);
+pub type ModuleNode<'a, M> = MetaNode<Module<'a, M>, M>;
 
 #[cfg(test)]
 mod tests {
@@ -68,19 +68,19 @@ mod tests {
             parsed,
             Module {
                 bindings: vec![
-                    Binding::new(
-                        "variable",
-                        Visibility::Public,
-                        None,
-                        Expression::Literal(ExpressionLiteral::Integral("15")),
-                    )
+                    Binding {
+                        name: "variable",
+                        visibility: Visibility::Public.into(),
+                        ty_: None,
+                        expression: Expression::Literal(ExpressionLiteral::Integral("15")).into(),
+                    }
                     .into(),
-                    Binding::new(
-                        "other",
-                        Visibility::Private,
-                        None,
-                        Expression::Literal(ExpressionLiteral::Integral("10")),
-                    )
+                    Binding {
+                        name: "other",
+                        visibility: Visibility::Private.into(),
+                        ty_: None,
+                        expression: Expression::Literal(ExpressionLiteral::Integral("10")).into(),
+                    }
                     .into()
                 ]
             }

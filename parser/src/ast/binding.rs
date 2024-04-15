@@ -4,45 +4,33 @@ use nom::combinator::{map, opt};
 use nom::error::context;
 use nom::sequence::tuple;
 
-use super::expression::ExpressionNode;
+use super::expression::ExprNode;
+use super::node::Node;
 use super::ty::TypeNode;
 use super::vis::VisibilityNode;
-use super::{make_node, parse_id, Describe, IResult, Input, Meta};
+use super::{parse_id, Describe, IResult, Input, Meta, MetaNode};
 
 /// Binging in form of:
 /// `[visibility] let name [: type] = expression;`
 #[derive(Debug, Clone, PartialEq)]
 pub struct Binding<'a, M> {
-    visibility: VisibilityNode<M>,
-    name: &'a str,
-    ty_: Option<TypeNode<M>>,
-    expression: ExpressionNode<'a, M>,
+    pub visibility: VisibilityNode<M>,
+    pub name: &'a str,
+    pub ty_: Option<TypeNode<M>>,
+    pub expression: ExprNode<'a, M>,
 }
 
-impl<'a, M> Binding<'a, M>
+impl<'a, M> Node<'a> for Binding<'a, M>
 where
     M: Meta + 'a,
 {
-    pub fn new(
-        name: &'a str,
-        visibility: impl Into<VisibilityNode<M>>,
-        ty_: impl Into<Option<TypeNode<M>>>,
-        expression: impl Into<ExpressionNode<'a, M>>,
-    ) -> Self {
-        Self {
-            name,
-            visibility: visibility.into(),
-            ty_: ty_.into(),
-            expression: expression.into(),
-        }
-    }
-
-    fn parse(input: impl Into<Input<'a>>) -> IResult<'a, Self> {
-        let ty_ = tuple((ch_(':'), multispace0, TypeNode::parse));
+    fn parser(input: Input<'a>) -> IResult<Self> {
+        let ty_ = tuple((ch_(':'), multispace0, TypeNode::parser));
         let ty_ = map(ty_, |(_colon, _, ty_)| ty_);
 
         let tpl = tuple((
-            VisibilityNode::parse,
+            VisibilityNode::parser,
+            multispace0,
             tag("let"),
             multispace1,
             parse_id,
@@ -51,28 +39,20 @@ where
             multispace0,
             ch_('='),
             multispace0,
-            ExpressionNode::parse,
+            ExprNode::parser,
             ch_(';'),
         ));
         let tpl = context("Binding", tpl);
 
         map(
             tpl,
-            |(visibility, _let, _, name, _, ty_, _, _eq, _, expression, _semi)| Self {
+            |(visibility, _, _let, _, name, _, ty_, _, _eq, _, expression, _semi)| Self {
                 visibility,
                 name: name.fragment(),
                 ty_,
                 expression,
             },
-        )(input.into())
-    }
-
-    pub fn expression(&self) -> &ExpressionNode<'a, M> {
-        &self.expression
-    }
-
-    pub fn expression_mut(&mut self) -> &mut ExpressionNode<'a, M> {
-        &mut self.expression
+        )(input)
     }
 }
 
@@ -94,7 +74,7 @@ where
     }
 }
 
-make_node!(Binding<'a, M> => BindingNode<'a, M>);
+pub type BindingNode<'a, M> = MetaNode<Binding<'a, M>, M>;
 
 #[cfg(test)]
 mod tests {

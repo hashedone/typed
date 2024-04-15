@@ -1,31 +1,38 @@
 use std::ops::{Deref, DerefMut};
 
-use nom::{combinator::map, Parser};
+use super::Input;
+use nom::combinator::map;
 
-use super::{Describe, Error, Input, Meta};
+use super::{Describe, IResult, Meta};
+
+pub trait Node<'a>: Sized {
+    fn parser(input: Input<'a>) -> IResult<Self>;
+
+    fn parse(input: &'a str) -> IResult<Self> {
+        Self::parser(input.into())
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct Node<T, M> {
+pub struct MetaNode<T, M> {
     node: T,
     meta: M,
 }
 
-impl<T, M> Node<T, M>
+impl<'a, T, M> Node<'a> for MetaNode<T, M>
 where
-    M: Meta,
+    M: Meta + 'a,
+    T: Node<'a> + 'a,
 {
-    pub fn parser<'a>(
-        p: impl Parser<Input<'a>, T, Error<'a>>,
-    ) -> impl Parser<Input<'a>, Self, Error<'a>>
-    where
-        M: 'a,
-        T: 'a,
-    {
-        map(<M as Meta>::parser(p), |(meta, node)| Node { meta, node })
+    fn parser(input: Input<'a>) -> IResult<Self> {
+        map(<M as Meta>::parser(T::parser), |(meta, node)| MetaNode {
+            meta,
+            node,
+        })(input)
     }
 }
 
-impl<T, M> Deref for Node<T, M> {
+impl<T, M> Deref for MetaNode<T, M> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -33,19 +40,19 @@ impl<T, M> Deref for Node<T, M> {
     }
 }
 
-impl<T, M> DerefMut for Node<T, M> {
+impl<T, M> DerefMut for MetaNode<T, M> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.node
     }
 }
 
-impl<T> From<T> for Node<T, ()> {
+impl<T> From<T> for MetaNode<T, ()> {
     fn from(node: T) -> Self {
-        Node { node, meta: () }
+        MetaNode { node, meta: () }
     }
 }
 
-impl<T, M, W> Describe<W> for Node<T, M>
+impl<T, M, W> Describe<W> for MetaNode<T, M>
 where
     T: Describe<W>,
     M: Meta,

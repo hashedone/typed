@@ -3,7 +3,7 @@ use nom::character::complete::anychar;
 use nom::combinator::{all_consuming, complete, map, recognize, verify};
 use nom::error::VerboseError;
 use nom::sequence::tuple;
-use nom::{Finish, Parser};
+use nom::Finish;
 use nom_locate::LocatedSpan;
 
 pub mod binding;
@@ -15,74 +15,32 @@ pub mod ty;
 pub mod vis;
 
 pub use module::ModuleNode;
-pub use node::Node;
+pub use node::MetaNode;
 pub use span::Span;
 pub use ty::TypeNode;
 pub use vis::VisibilityNode;
 
-macro_rules! make_node {
-    ($type:ident<$($lt:lifetime,)* $($gen:ident),*> => $node:ident<$input_lt:lifetime, $meta:ident>) => {
-        pub type $node<$($lt,)* $($gen),*> = crate::ast::Node<$type<$($lt,)* $($gen),*>, $meta>;
-
-        impl<$($lt,)* $($gen),*> $node<$($lt,)* $($gen),*>
-        where
-            $meta: crate::ast::Meta + $input_lt,
-        {
-            pub fn parse(input: impl Into<crate::ast::Input<$input_lt>>) -> crate::ast::IResult<$input_lt, Self> {
-                use nom::Parser;
-                crate::ast::Node::parser($type::parse).parse(input.into())
-            }
-        }
-    };
-    ($type:ident<$($lt:lifetime),*> => $node:ident<$input_lt:lifetime>) => {
-        pub type $node<$($lt,)* M> = crate::ast::Node<$type<$($lt),*>, M>;
-
-        impl<$($lt,)* M> $node<$($lt,)* M>
-        where
-            M: crate::ast::Meta + $input_lt,
-        {
-            pub fn parse(input: impl Into<crate::ast::Input<$input_lt>>) -> crate::ast::IResult<$input_lt, Self> {
-                use nom::Parser;
-                crate::ast::Node::parser($type::parse).parse(input.into())
-            }
-        }
-    };
-    ($type:ident => $node:ident) => {
-        pub type $node<M> = crate::ast::Node<$type, M>;
-
-        impl<M> $node<M>
-        where
-            M: crate::ast::Meta,
-        {
-            pub fn parse<'a>(input: impl Into<crate::ast::Input<'a>>) -> crate::ast::IResult<'a, Self> where M: 'a {
-                use nom::Parser;
-                crate::ast::Node::parser($type::parse).parse(input.into())
-            }
-        }
-    };
-}
-
-pub(crate) use make_node;
+use self::node::Node;
 
 type Input<'a> = LocatedSpan<&'a str>;
 type Error<'a> = VerboseError<Input<'a>>;
 type IResult<'a, T> = nom::IResult<Input<'a>, T, Error<'a>>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct AST<'a, M = ()> {
+pub struct Ast<'a, M = ()> {
     module: ModuleNode<'a, M>,
 }
 
-pub type Raw<'a> = AST<'a, ()>;
-pub type Spanned<'a> = AST<'a, Span>;
+pub type Raw<'a> = Ast<'a, ()>;
+pub type Spanned<'a> = Ast<'a, Span>;
 
-impl<'a, M> AST<'a, M>
+impl<'a, M> Ast<'a, M>
 where
     M: Meta + 'a,
 {
     pub fn parse(input: &'a str) -> Result<Self, Error> {
         let input = LocatedSpan::new(input);
-        all_consuming(complete(ModuleNode::parse))(input)
+        all_consuming(complete(ModuleNode::parser))(input)
             .finish()
             .map(|(_, module)| Self { module })
     }
@@ -116,8 +74,8 @@ pub trait Describe<W> {
 
 pub trait Meta: Sized {
     fn parser<'a, O>(
-        p: impl Parser<Input<'a>, O, Error<'a>>,
-    ) -> impl Parser<Input<'a>, (Self, O), Error<'a>>
+        p: impl nom::Parser<Input<'a>, O, Error<'a>>,
+    ) -> impl nom::Parser<Input<'a>, (Self, O), Error<'a>>
     where
         O: 'a,
         Self: 'a;
@@ -127,8 +85,8 @@ pub trait Meta: Sized {
 
 impl Meta for () {
     fn parser<'a, O: 'a>(
-        p: impl Parser<Input<'a>, O, Error<'a>>,
-    ) -> impl Parser<Input<'a>, (Self, O), Error<'a>> {
+        p: impl nom::Parser<Input<'a>, O, Error<'a>>,
+    ) -> impl nom::Parser<Input<'a>, (Self, O), Error<'a>> {
         map(p, |o| ((), o))
     }
 
@@ -154,26 +112,30 @@ mod tests {
 
     #[test]
     fn ast() {
-        let parsed = AST::parse("pub let variable = 15; let other = 10;").unwrap();
+        let parsed = Ast::parse("pub let variable = 15; let other = 10;").unwrap();
         assert_eq!(
             parsed,
-            AST {
-                module: Module::new([
-                    Binding::new(
-                        "variable",
-                        Visibility::Public,
-                        None,
-                        Expression::Literal(ExpressionLiteral::Integral("15")),
-                    )
-                    .into(),
-                    Binding::new(
-                        "other",
-                        Visibility::Private,
-                        None,
-                        Expression::Literal(ExpressionLiteral::Integral("10")),
-                    )
-                    .into()
-                ])
+            Ast {
+                module: Module {
+                    bindings: vec![
+                        Binding {
+                            name: "variable",
+                            visibility: Visibility::Public.into(),
+                            ty_: None,
+                            expression: Expression::Literal(ExpressionLiteral::Integral("15"))
+                                .into(),
+                        }
+                        .into(),
+                        Binding {
+                            name: "other",
+                            visibility: Visibility::Private.into(),
+                            ty_: None,
+                            expression: Expression::Literal(ExpressionLiteral::Integral("10"))
+                                .into(),
+                        }
+                        .into()
+                    ]
+                }
                 .into()
             }
         );
