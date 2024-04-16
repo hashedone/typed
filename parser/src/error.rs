@@ -1,10 +1,10 @@
 use nom::error::ContextError;
 use thiserror::Error;
 
-use crate::ast::Input;
+use crate::ast::{spanned::Span, Input};
 
 /// Parsing failure
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq)]
 #[error("Unexpected token")]
 pub struct Error<'a> {
     /// Where the token missmatch occured
@@ -12,7 +12,7 @@ pub struct Error<'a> {
     /// The name of last context parser
     pub context: &'a str,
     /// Span of the last context parser
-    pub context_offset: usize,
+    pub context_span: Span,
 }
 
 impl<'a> nom::error::ParseError<Input<'a>> for Error<'a> {
@@ -22,7 +22,7 @@ impl<'a> nom::error::ParseError<Input<'a>> for Error<'a> {
         Self {
             offset,
             context: "",
-            context_offset: offset,
+            context_span: offset..offset + 1,
         }
     }
 
@@ -41,7 +41,7 @@ impl<'a> ContextError<Input<'a>> for Error<'a> {
             } => Self {
                 offset,
                 context,
-                context_offset: input.location_offset(),
+                context_span: input.location_offset()..input.location_offset() + 1,
             },
             _ => other,
         }

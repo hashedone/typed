@@ -4,8 +4,8 @@ use nom::combinator::{map, opt, peek, value};
 use nom::error::context;
 use nom::sequence::terminated;
 
-use super::node::Node;
-use super::{Describe, IResult, Input, MetaNode};
+use super::spanned::{spanned, Spanned};
+use super::{Describe, IResult, Input};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Visibility {
@@ -15,16 +15,16 @@ pub enum Visibility {
     Public,
 }
 
-impl<'a> Node<'a> for Visibility {
-    fn parser(input: Input<'a>) -> IResult<Self> {
-        let pub_ = value(
-            Visibility::Public,
-            terminated(tag("pub"), peek(one_of(" \t\r\n"))),
-        );
-        let vis = map(opt(pub_), |v| v.unwrap_or(Visibility::Private));
+pub type VisibilityNode = Spanned<Visibility>;
 
-        context("Visibility", vis)(input)
-    }
+pub fn visibility(input: Input) -> IResult<Spanned<Visibility>> {
+    let pub_ = value(
+        Visibility::Public,
+        terminated(tag("pub"), peek(one_of(" \t\r\n"))),
+    );
+    let vis = map(opt(pub_), |v| v.unwrap_or(Visibility::Private));
+
+    context("Visibility", spanned(vis))(input)
 }
 
 impl<W> Describe<W> for Visibility
@@ -43,19 +43,18 @@ where
     }
 }
 
-pub type VisibilityNode<M> = MetaNode<Visibility, M>;
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn visibility() {
-        let (tail, parsed) = VisibilityNode::parse("").unwrap();
+    fn parse_visibility() {
+        let (tail, parsed) = visibility("".into()).unwrap();
+
         assert_eq!(*tail.fragment(), "");
         assert_eq!(parsed, Visibility::Private.into());
 
-        let (tail, parsed) = VisibilityNode::parse("pub ").unwrap();
+        let (tail, parsed) = visibility("pub ".into()).unwrap();
         assert_eq!(*tail.fragment(), " ");
         assert_eq!(parsed, Visibility::Public.into());
     }

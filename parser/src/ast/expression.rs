@@ -3,8 +3,8 @@ use nom::combinator::{map, opt, recognize};
 use nom::error::context;
 use nom::sequence::tuple;
 
-use super::node::Node;
-use super::{Describe, IResult, Input, MetaNode};
+use super::spanned::{spanned, Spanned};
+use super::{Describe, IResult, Input};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ExpressionLiteral<'a> {
@@ -13,16 +13,6 @@ pub enum ExpressionLiteral<'a> {
 }
 
 impl<'a> ExpressionLiteral<'a> {
-    fn parse(input: Input<'a>) -> IResult<'a, Self> {
-        let sign = opt(ch_('-'));
-        let literal = tuple((sign, multispace0, digit1));
-        let literal = context("Integral literal", literal);
-
-        map(recognize(literal), |lit: Input<'a>| {
-            ExpressionLiteral::Integral(lit.fragment())
-        })(input)
-    }
-
     fn format(&self, f: &mut impl std::io::Write) -> std::io::Result<()> {
         match self {
             Self::Integral(lit) => write!(f, "LIT INT {}", lit),
@@ -30,18 +20,28 @@ impl<'a> ExpressionLiteral<'a> {
     }
 }
 
+fn expression_literal(input: Input) -> IResult<'_, ExpressionLiteral<'_>> {
+    let sign = opt(ch_('-'));
+    let literal = tuple((sign, multispace0, digit1));
+    let literal = context("Integral literal", literal);
+
+    map(recognize(literal), |lit: Input| {
+        ExpressionLiteral::Integral(lit.fragment())
+    })(input)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Expression<'a> {
     Literal(ExpressionLiteral<'a>),
 }
 
-impl<'a> Node<'a> for Expression<'a> {
-    fn parser(input: Input<'a>) -> IResult<Self> {
-        context(
-            "Expression",
-            map(ExpressionLiteral::parse, Expression::Literal),
-        )(input)
-    }
+pub type ExprNode<'a> = Spanned<Expression<'a>>;
+
+pub fn expression(input: Input) -> IResult<ExprNode> {
+    context(
+        "Expression",
+        spanned(map(expression_literal, Expression::Literal)),
+    )(input)
 }
 
 impl<'a, W> Describe<W> for Expression<'a>
@@ -64,35 +64,33 @@ where
     }
 }
 
-pub type ExprNode<'a, M> = MetaNode<Expression<'a>, M>;
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn expression_literal_integral() {
-        let (tail, parsed) = ExprNode::parse("0").unwrap();
+    fn parse_expression_literal_integral() {
+        let (tail, parsed) = expression("0".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
             Expression::Literal(ExpressionLiteral::Integral("0")).into()
         );
 
-        let (tail, parsed) = ExprNode::parse("1357").unwrap();
+        let (tail, parsed) = expression("1357".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
             Expression::Literal(ExpressionLiteral::Integral("1357")).into()
         );
 
-        let (tail, parsed) = ExprNode::parse("-135234").unwrap();
+        let (tail, parsed) = expression("-135234".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
             Expression::Literal(ExpressionLiteral::Integral("-135234")).into()
         );
 
-        Expression::parse("bar").unwrap_err();
+        expression("bar".into()).unwrap_err();
     }
 }

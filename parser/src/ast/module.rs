@@ -3,39 +3,22 @@ use nom::combinator::{cut, eof, map, not};
 use nom::error::context;
 use nom::multi::many0;
 use nom::sequence::{preceded, terminated};
+use nom::Err;
 
-use super::binding::BindingNode;
-use super::node::Node;
-use super::{Describe, IResult, Input, Meta, MetaNode};
+use crate::error::Error;
+
+use super::binding::{binding, BindingNode};
+use super::recover::recover;
+use super::spanned::{spanned, Spanned};
+use super::{Describe, IResult, Input};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Module<'a, M = ()> {
-    pub bindings: Vec<BindingNode<'a, M>>,
+pub struct Module<'a> {
+    pub bindings: Vec<BindingNode<'a>>,
 }
 
-impl<'a, M> Node<'a> for Module<'a, M>
+impl<'a, W> Describe<W> for Module<'a>
 where
-    M: Meta + 'a,
-{
-    fn parser(input: Input<'a>) -> IResult<Self> {
-        let binding = preceded(not(eof), cut(BindingNode::parser));
-        let binding = preceded(multispace0, binding);
-        let bindings = many0(binding);
-        let bindings = terminated(bindings, multispace0);
-
-        context("Module", map(bindings, |bindings| Self { bindings }))(input)
-    }
-}
-
-impl<'a> Module<'a, ()> {
-    pub fn meta(self) -> ModuleNode<'a, ()> {
-        self.into()
-    }
-}
-
-impl<'a, M, W> Describe<W> for Module<'a, M>
-where
-    M: Meta,
     W: std::io::Write,
 {
     fn describe(&self, f: &mut W) -> std::io::Result<()> {
@@ -50,7 +33,48 @@ where
     }
 }
 
-pub type ModuleNode<'a, M> = MetaNode<Module<'a, M>, M>;
+pub type ModuleNode<'a> = Spanned<Module<'a>>;
+
+pub fn module(input: Input) -> IResult<(ModuleNode, Vec<Error>)> {
+    let binding = preceded(not(eof), cut(binding));
+    let mut binding = preceded(multispace0, binding);
+
+    let binding_recovered = move |input| match binding(input) {
+        Ok((tail, binding)) => Ok((tail, Ok(binding))),
+        Err(Err::Failure(mut err)) => {
+            let (tail, span) = recover(input)?;
+            err.context_span.end = span.end;
+            Ok((tail, Err(err)))
+        }
+        Err(err) => Err(err),
+    };
+
+    let bindings = many0(binding_recovered);
+    let bindings = terminated(bindings, multispace0);
+
+    context(
+        "Module",
+        map(spanned(bindings), |b| {
+            let mut bindings = vec![];
+            let mut errors = vec![];
+
+            for binding in b.node {
+                match binding {
+                    Ok(binding) => bindings.push(binding),
+                    Err(err) => errors.push(err),
+                }
+            }
+
+            let module = Module { bindings };
+            let node = Spanned {
+                node: module,
+                span: b.span,
+            };
+
+            (node, errors)
+        }),
+    )(input)
+}
 
 #[cfg(test)]
 mod tests {
@@ -61,8 +85,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn module() {
-        let (tail, parsed) = ModuleNode::parse("pub let variable = 15; let other = 10;").unwrap();
+    fn parse_module() {
+        let (tail, (parsed, errors)) =
+            module("pub let variable = 15; let other = 10;".into()).unwrap();
+        assert_eq!(errors, []);
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
