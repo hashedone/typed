@@ -1,9 +1,9 @@
-use std::path::PathBuf;
+use std::{ops::Range, path::PathBuf};
 
+use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use clap::Parser;
 use color_eyre::Result;
 use eyre::Context;
-use nom::error::convert_error;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -15,6 +15,22 @@ struct Args {
     /// Input file name
     #[arg(short, long)]
     input: PathBuf,
+}
+
+fn create_report<'a>(
+    source_name: &'a str,
+    error: parser::error::Error<'a>,
+) -> Report<'a, (&'a str, Range<usize>)> {
+    let highlight = Color::Fixed(81);
+
+    Report::build(ReportKind::Error, source_name, error.offset)
+        .with_code(1)
+        .with_message(error.to_string())
+        .with_label(
+            Label::new((source_name, error.context_offset..error.context_offset + 1))
+                .with_message(format!("While parsing {}", error.context.fg(highlight))),
+        )
+        .finish()
 }
 
 fn main() -> Result<()> {
@@ -31,17 +47,8 @@ fn main() -> Result<()> {
 
     let module = match Ast::parse(&source) {
         Err(err) => {
-            let err: Vec<_> = err
-                .errors
-                .into_iter()
-                .map(|(input, error)| (*input.fragment(), error))
-                .collect();
-
-            print!(
-                "While compiling {}:\n{}",
-                args.input.to_string_lossy(),
-                convert_error(source.as_str(), nom::error::VerboseError { errors: err })
-            );
+            let input_name = args.input.as_os_str().to_str().unwrap_or("");
+            create_report(input_name, err).eprint((input_name, Source::from(&source)))?;
 
             return Ok(());
         }

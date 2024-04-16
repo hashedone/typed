@@ -1,2 +1,4 @@
 let variable = 14;
 let other = variable;
+let yet_another = other;
+let this_is_literal = 20;

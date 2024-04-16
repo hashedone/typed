@@ -1,29 +1,28 @@
 use nom::bytes::complete::take_while1;
 use nom::character::complete::anychar;
 use nom::combinator::{all_consuming, complete, map, recognize, verify};
-use nom::error::VerboseError;
 use nom::sequence::tuple;
 use nom::Finish;
-use nom_locate::LocatedSpan;
+use nom_locate::{position, LocatedSpan};
 
 pub mod binding;
 pub mod expression;
 pub mod module;
 pub mod node;
-pub mod span;
 pub mod ty;
 pub mod vis;
 
 pub use module::ModuleNode;
 pub use node::MetaNode;
-pub use span::Span;
 pub use ty::TypeNode;
 pub use vis::VisibilityNode;
 
+use crate::error::Error;
+use crate::Span;
+
 use self::node::Node;
 
-type Input<'a> = LocatedSpan<&'a str>;
-type Error<'a> = VerboseError<Input<'a>>;
+pub(crate) type Input<'a> = LocatedSpan<&'a str>;
 type IResult<'a, T> = nom::IResult<Input<'a>, T, Error<'a>>;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -92,6 +91,23 @@ impl Meta for () {
 
     fn describe(&self, _f: &mut impl std::io::Write) -> std::io::Result<()> {
         Ok(())
+    }
+}
+
+impl Meta for Span {
+    fn parser<'a, O: 'a>(
+        p: impl nom::Parser<Input<'a>, O, Error<'a>>,
+    ) -> impl nom::Parser<Input<'a>, (Self, O), Error<'a>> {
+        map(tuple((position, p, position)), |(beg, output, end)| {
+            (
+                (beg.location_offset()..end.location_offset()).into(),
+                output,
+            )
+        })
+    }
+
+    fn describe(&self, f: &mut impl std::io::Write) -> std::io::Result<()> {
+        write!(f, "[@{}:{}] ", self.range().start, self.range().end)
     }
 }
 

@@ -37,7 +37,10 @@ pub enum Expression<'a> {
 
 impl<'a> Node<'a> for Expression<'a> {
     fn parser(input: Input<'a>) -> IResult<Self> {
-        map(ExpressionLiteral::parse, Expression::Literal)(input)
+        context(
+            "Expression",
+            map(ExpressionLiteral::parse, Expression::Literal),
+        )(input)
     }
 }
 
