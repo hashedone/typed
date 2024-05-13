@@ -16,15 +16,15 @@ pub mod vis;
 pub use module::{module, ModuleNode};
 pub use ty::TypeNode;
 
-use crate::error::Error;
+use crate::error::{Error, RecoveredError};
 
 pub(crate) type Input<'a> = LocatedSpan<&'a str>;
-type IResult<'a, T> = nom::IResult<Input<'a>, T, Error<'a>>;
+type IResult<'a, T> = nom::IResult<Input<'a>, T, Error>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast<'a> {
     pub module: Option<ModuleNode<'a>>,
-    pub errors: Vec<Error<'a>>,
+    pub errors: Vec<RecoveredError>,
 }
 
 impl<'a> Ast<'a> {
@@ -39,7 +39,10 @@ impl<'a> Ast<'a> {
             },
             Err(err) => Self {
                 module: None,
-                errors: vec![err],
+                errors: vec![RecoveredError {
+                    error: err,
+                    recovery_point: input.len(),
+                }],
             },
         }
     }

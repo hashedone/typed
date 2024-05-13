@@ -5,7 +5,7 @@ use nom::multi::many0;
 use nom::sequence::{preceded, terminated};
 use nom::Err;
 
-use crate::error::Error;
+use crate::error::RecoveredError;
 
 use super::binding::{binding, BindingNode};
 use super::recover::recover;
@@ -35,15 +35,18 @@ where
 
 pub type ModuleNode<'a> = Spanned<Module<'a>>;
 
-pub fn module(input: Input) -> IResult<(ModuleNode, Vec<Error>)> {
+pub fn module(input: Input) -> IResult<(ModuleNode, Vec<RecoveredError>)> {
     let binding = preceded(not(eof), cut(binding));
     let mut binding = preceded(multispace0, binding);
 
     let binding_recovered = move |input| match binding(input) {
         Ok((tail, binding)) => Ok((tail, Ok(binding))),
-        Err(Err::Failure(mut err)) => {
+        Err(Err::Failure(err)) => {
             let (tail, span) = recover(input)?;
-            err.context_span.end = span.end;
+            let err = RecoveredError {
+                error: err,
+                recovery_point: span.end,
+            };
             Ok((tail, Err(err)))
         }
         Err(err) => Err(err),

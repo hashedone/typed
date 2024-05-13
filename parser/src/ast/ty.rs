@@ -1,6 +1,9 @@
+use nom::branch::alt;
 use nom::bytes::complete::tag;
+use nom::character::complete::{char as ch_, multispace0};
 use nom::combinator::{map, value};
 use nom::error::context;
+use nom::sequence::delimited;
 
 use super::spanned::{spanned, Spanned};
 use super::{Describe, IResult, Input};
@@ -20,12 +23,13 @@ impl BasicType {
 }
 
 fn basic_type(input: Input<'_>) -> IResult<BasicType> {
-    context("BasicType", value(BasicType::U32, tag("u32")))(input)
+    context("Basic type", value(BasicType::U32, tag("u32")))(input)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Type {
     Basic(BasicType),
+    Unit,
 }
 
 impl<W> Describe<W> for Type
@@ -35,6 +39,7 @@ where
     fn describe(&self, f: &mut W) -> std::io::Result<()> {
         match self {
             Self::Basic(ty_) => ty_.describe(f),
+            Self::Unit => write!(f, "UNIT"),
         }
     }
 
@@ -46,7 +51,13 @@ where
 pub type TypeNode = Spanned<Type>;
 
 pub fn type_(input: Input) -> IResult<TypeNode> {
-    context("Type", spanned(map(basic_type, Type::Basic)))(input)
+    let unit = context(
+        "Unit type",
+        value(Type::Unit, delimited(ch_('('), multispace0, ch_(')'))),
+    );
+    let basic = map(basic_type, Type::Basic);
+
+    context("Type", spanned(alt((unit, basic))))(input)
 }
 
 #[cfg(test)]
@@ -65,5 +76,12 @@ mod tests {
         let (tail, parsed) = type_("u32".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(parsed, Type::Basic(BasicType::U32).into());
+    }
+
+    #[test]
+    fn parse_unit() {
+        let (tail, parsed) = type_("()".into()).unwrap();
+        assert_eq!(*tail.fragment(), "");
+        assert_eq!(parsed, Type::Unit.into());
     }
 }

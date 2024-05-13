@@ -12,7 +12,7 @@ use super::{Error, Input};
 //
 // It is intended to be used after the parsing failure, when we know what other entities we are
 // looking for after recovery.
-pub fn recover<'a>(input: Input<'a>) -> nom::IResult<Input<'a>, Span, Error<'a>> {
+pub fn recover<'a>(input: Input<'a>) -> nom::IResult<Input<'a>, Span, Error> {
     map(
         tuple((
             multispace0,

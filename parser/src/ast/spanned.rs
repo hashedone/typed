@@ -29,8 +29,8 @@ impl<T> From<T> for Spanned<T> {
 }
 
 pub fn spanned<'a, T>(
-    parser: impl Parser<Input<'a>, T, Error<'a>>,
-) -> impl Parser<Input<'a>, Spanned<T>, Error<'a>> {
+    parser: impl Parser<Input<'a>, T, Error>,
+) -> impl Parser<Input<'a>, Spanned<T>, Error> {
     map(tuple((position, parser, position)), |(beg, node, end)| {
         Spanned {
             node,
