@@ -5,12 +5,12 @@ use nom::multi::many0;
 use nom::sequence::{preceded, terminated};
 use nom::Err;
 
-use crate::error::RecoveredError;
+use crate::error::Error;
 
 use super::binding::{binding, BindingNode};
 use super::recover::recover;
 use super::spanned::{spanned, Spanned};
-use super::{Describe, IResult, Input};
+use super::{mape, Describe, IResult, Input};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module<'a> {
@@ -35,7 +35,7 @@ where
 
 pub type ModuleNode<'a> = Spanned<Module<'a>>;
 
-pub fn module(input: Input) -> IResult<(ModuleNode, Vec<RecoveredError>)> {
+pub fn module(input: Input) -> IResult<ModuleNode> {
     let binding = preceded(not(eof), cut(binding));
     let mut binding = preceded(multispace0, binding);
 
@@ -43,7 +43,7 @@ pub fn module(input: Input) -> IResult<(ModuleNode, Vec<RecoveredError>)> {
         Ok((tail, binding)) => Ok((tail, Ok(binding))),
         Err(Err::Failure(err)) => {
             let (tail, span) = recover(input)?;
-            let err = RecoveredError {
+            let err = Error::Parse {
                 error: err,
                 recovery_point: span.end,
             };
@@ -55,28 +55,26 @@ pub fn module(input: Input) -> IResult<(ModuleNode, Vec<RecoveredError>)> {
     let bindings = many0(binding_recovered);
     let bindings = terminated(bindings, multispace0);
 
-    context(
-        "Module",
-        map(spanned(bindings), |b| {
-            let mut bindings = vec![];
-            let mut errors = vec![];
+    let bindings = map(bindings, |b| {
+        let mut bindings = vec![];
+        let mut errors = vec![];
 
-            for binding in b.node {
-                match binding {
-                    Ok(binding) => bindings.push(binding),
-                    Err(err) => errors.push(err),
+        for binding in b {
+            match binding {
+                Ok((binding, err)) => {
+                    bindings.push(binding);
+                    errors.extend(err);
                 }
+                Err(err) => errors.push(err),
             }
+        }
 
-            let module = Module { bindings };
-            let node = Spanned {
-                node: module,
-                span: b.span,
-            };
+        (bindings, errors)
+    });
 
-            (node, errors)
-        }),
-    )(input)
+    let module = spanned(mape(bindings, |bindings| Module { bindings }));
+
+    context("Module", module)(input)
 }
 
 #[cfg(test)]

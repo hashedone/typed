@@ -7,7 +7,7 @@ use nom::Parser;
 use nom_locate::position;
 
 use super::{Describe, Input};
-use crate::error::Error;
+use crate::error::{Error, ParseError};
 
 pub type Span = Range<usize>;
 
@@ -29,14 +29,20 @@ impl<T> From<T> for Spanned<T> {
 }
 
 pub fn spanned<'a, T>(
-    parser: impl Parser<Input<'a>, T, Error>,
-) -> impl Parser<Input<'a>, Spanned<T>, Error> {
-    map(tuple((position, parser, position)), |(beg, node, end)| {
-        Spanned {
-            node,
-            span: beg.location_offset()..end.location_offset(),
-        }
-    })
+    parser: impl Parser<Input<'a>, (T, Vec<Error>), ParseError>,
+) -> impl Parser<Input<'a>, (Spanned<T>, Vec<Error>), ParseError> {
+    map(
+        tuple((position, parser, position)),
+        |(beg, (node, err), end)| {
+            (
+                Spanned {
+                    node,
+                    span: beg.location_offset()..end.location_offset(),
+                },
+                err,
+            )
+        },
+    )
 }
 
 impl<T, W> Describe<W> for Spanned<T>

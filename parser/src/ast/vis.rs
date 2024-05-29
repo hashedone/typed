@@ -5,7 +5,7 @@ use nom::error::context;
 use nom::sequence::terminated;
 
 use super::spanned::{spanned, Spanned};
-use super::{Describe, IResult, Input};
+use super::{noerr, Describe, IResult, Input};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Visibility {
@@ -24,7 +24,7 @@ pub fn visibility(input: Input) -> IResult<Spanned<Visibility>> {
     );
     let vis = map(opt(pub_), |v| v.unwrap_or(Visibility::Private));
 
-    context("Visibility", spanned(vis))(input)
+    context("Visibility", spanned(noerr(vis)))(input)
 }
 
 impl<W> Describe<W> for Visibility
@@ -49,13 +49,15 @@ mod tests {
 
     #[test]
     fn parse_visibility() {
-        let (tail, parsed) = visibility("".into()).unwrap();
+        let (tail, (parsed, err)) = visibility("".into()).unwrap();
 
         assert_eq!(*tail.fragment(), "");
         assert_eq!(parsed, Visibility::Private.into());
+        assert_eq!(err, []);
 
-        let (tail, parsed) = visibility("pub ".into()).unwrap();
+        let (tail, (parsed, err)) = visibility("pub ".into()).unwrap();
         assert_eq!(*tail.fragment(), " ");
         assert_eq!(parsed, Visibility::Public.into());
+        assert_eq!(err, []);
     }
 }

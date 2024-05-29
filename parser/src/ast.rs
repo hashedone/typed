@@ -1,8 +1,8 @@
 use nom::bytes::complete::take_while1;
 use nom::character::complete::anychar;
-use nom::combinator::{all_consuming, complete, recognize, verify};
+use nom::combinator::{all_consuming, complete, map, recognize, verify};
 use nom::sequence::tuple;
-use nom::Finish;
+use nom::{Finish, Parser};
 use nom_locate::LocatedSpan;
 
 pub mod binding;
@@ -16,15 +16,15 @@ pub mod vis;
 pub use module::{module, ModuleNode};
 pub use ty::TypeNode;
 
-use crate::error::{Error, RecoveredError};
+use crate::error::{Error, ParseError};
 
 pub(crate) type Input<'a> = LocatedSpan<&'a str>;
-type IResult<'a, T> = nom::IResult<Input<'a>, T, Error>;
+type IResult<'a, T> = nom::IResult<Input<'a>, (T, Vec<Error>), ParseError>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast<'a> {
     pub module: Option<ModuleNode<'a>>,
-    pub errors: Vec<RecoveredError>,
+    pub errors: Vec<Error>,
 }
 
 impl<'a> Ast<'a> {
@@ -39,7 +39,7 @@ impl<'a> Ast<'a> {
             },
             Err(err) => Self {
                 module: None,
-                errors: vec![RecoveredError {
+                errors: vec![Error::Parse {
                     error: err,
                     recovery_point: input.len(),
                 }],
@@ -82,7 +82,20 @@ pub trait Describe<W> {
 fn parse_id(input: Input) -> IResult<Input> {
     let head = verify(anychar, |c| c.is_alphabetic() || *c == '_');
     let tail = take_while1(|c: char| c.is_alphanumeric() || c == '_');
-    recognize(tuple((head, tail)))(input)
+    map(recognize(tuple((head, tail))), |id| (id, vec![]))(input)
+}
+
+fn noerr<'a, T>(
+    parser: impl Parser<Input<'a>, T, ParseError>,
+) -> impl Parser<Input<'a>, (T, Vec<Error>), ParseError> {
+    map(parser, |t| (t, vec![]))
+}
+
+fn mape<'a, T, U>(
+    parser: impl Parser<Input<'a>, (T, Vec<Error>), ParseError>,
+    mut f: impl FnMut(T) -> U,
+) -> impl Parser<Input<'a>, (U, Vec<Error>), ParseError> {
+    map(parser, move |(t, e)| (f(t), e))
 }
 
 #[cfg(test)]

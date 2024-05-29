@@ -9,7 +9,7 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use parser::ast::Ast;
-use parser::error::Error;
+use parser::error::ParseError;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -42,14 +42,14 @@ fn create_report_unexpected<'a>(
         .finish()
 }
 
-fn create_report(
-    source_name: &str,
-    error: parser::error::RecoveredError,
-) -> Report<(&str, Range<usize>)> {
-    match error.error {
-        Error::Unexpected { offset, context } => {
-            create_report_unexpected(source_name, offset, context, error.recovery_point)
-        }
+fn create_report(source_name: &str, error: parser::error::Error) -> Report<(&str, Range<usize>)> {
+    use parser::error::Error;
+
+    match error {
+        Error::Parse {
+            error: ParseError::Unexpected { offset, context },
+            recovery_point,
+        } => create_report_unexpected(source_name, offset, context, recovery_point),
     }
 }
 

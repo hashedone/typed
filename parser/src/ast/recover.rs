@@ -5,14 +5,14 @@ use nom::sequence::tuple;
 use nom_locate::{position, LocatedSpan};
 
 use super::spanned::Span;
-use super::{Error, Input};
+use super::{Input, ParseError};
 
 // Parser that tries to reach the next point from whitch it is worth to recover parsing for next
 // tokens. It returns the `Span` that is skipped part up until the recovery point.
 //
 // It is intended to be used after the parsing failure, when we know what other entities we are
 // looking for after recovery.
-pub fn recover<'a>(input: Input<'a>) -> nom::IResult<Input<'a>, Span, Error> {
+pub fn recover<'a>(input: Input<'a>) -> nom::IResult<Input<'a>, Span, ParseError> {
     map(
         tuple((
             multispace0,

@@ -62,11 +62,33 @@ pub fn binding(input: Input) -> IResult<BindingNode> {
 
     spanned(map(
         tpl,
-        |(visibility, _, _let, _, name, _, ty_, _, _eq, _, expression, _semi)| Binding {
-            visibility,
-            name: name.fragment(),
+        |(
+            (visibility, mut viserr),
+            _,
+            _let,
+            _,
+            (name, nameerr),
+            _,
             ty_,
-            expression,
+            _,
+            _eq,
+            _,
+            (expression, exprerr),
+            _semi,
+        )| {
+            let (ty_, tyerr) = ty_.unzip();
+            viserr.extend(nameerr);
+            viserr.extend(tyerr.into_iter().flatten());
+            viserr.extend(exprerr);
+            (
+                Binding {
+                    visibility,
+                    name: name.fragment(),
+                    ty_,
+                    expression,
+                },
+                viserr,
+            )
         },
     ))
     .parse(input)
@@ -82,7 +104,7 @@ mod tests {
 
     #[test]
     fn parse_binding() {
-        let (tail, parsed) = binding("let variable = 15;".into()).unwrap();
+        let (tail, (parsed, err)) = binding("let variable = 15;".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
@@ -94,8 +116,9 @@ mod tests {
             }
             .into()
         );
+        assert_eq!(err, []);
 
-        let (tail, parsed) = binding("pub let other = 10;".into()).unwrap();
+        let (tail, (parsed, err)) = binding("pub let other = 10;".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
@@ -107,8 +130,9 @@ mod tests {
             }
             .into()
         );
+        assert_eq!(err, []);
 
-        let (tail, parsed) = binding("let two: u32 = 2;".into()).unwrap();
+        let (tail, (parsed, err)) = binding("let two: u32 = 2;".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
@@ -120,5 +144,6 @@ mod tests {
             }
             .into()
         );
+        assert_eq!(err, []);
     }
 }

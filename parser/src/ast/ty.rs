@@ -1,12 +1,12 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{char as ch_, multispace0};
-use nom::combinator::{map, value};
+use nom::combinator::value;
 use nom::error::context;
 use nom::sequence::delimited;
 
 use super::spanned::{spanned, Spanned};
-use super::{Describe, IResult, Input};
+use super::{mape, noerr, Describe, IResult, Input};
 
 /// Built-in type: `u32`
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -23,7 +23,7 @@ impl BasicType {
 }
 
 fn basic_type(input: Input<'_>) -> IResult<BasicType> {
-    context("Basic type", value(BasicType::U32, tag("u32")))(input)
+    context("Basic type", noerr(value(BasicType::U32, tag("u32"))))(input)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -53,9 +53,12 @@ pub type TypeNode = Spanned<Type>;
 pub fn type_(input: Input) -> IResult<TypeNode> {
     let unit = context(
         "Unit type",
-        value(Type::Unit, delimited(ch_('('), multispace0, ch_(')'))),
+        noerr(value(
+            Type::Unit,
+            delimited(ch_('('), multispace0, ch_(')')),
+        )),
     );
-    let basic = map(basic_type, Type::Basic);
+    let basic = mape(basic_type, Type::Basic);
 
     context("Type", spanned(alt((unit, basic))))(input)
 }
@@ -66,22 +69,25 @@ mod tests {
 
     #[test]
     fn parse_basic_type() {
-        let (tail, parsed) = basic_type("u32".into()).unwrap();
+        let (tail, (parsed, err)) = basic_type("u32".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(parsed, BasicType::U32);
+        assert_eq!(err, []);
     }
 
     #[test]
     fn parse_type() {
-        let (tail, parsed) = type_("u32".into()).unwrap();
+        let (tail, (parsed, err)) = type_("u32".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(parsed, Type::Basic(BasicType::U32).into());
+        assert_eq!(err, []);
     }
 
     #[test]
     fn parse_unit() {
-        let (tail, parsed) = type_("()".into()).unwrap();
+        let (tail, (parsed, err)) = type_("()".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(parsed, Type::Unit.into());
+        assert_eq!(err, []);
     }
 }

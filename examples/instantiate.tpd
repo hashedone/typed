@@ -1,1 +1,1 @@
-pub let instantiate = fn(x: i32) -> i32 { x }
+pub let instantiate = fn(x: i32) -> i32 { x };

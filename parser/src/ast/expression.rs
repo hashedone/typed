@@ -6,7 +6,7 @@ use nom::error::context;
 use nom::sequence::{terminated, tuple};
 
 use super::spanned::{spanned, Spanned};
-use super::{Describe, IResult, Input};
+use super::{mape, noerr, Describe, IResult, Input};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ExpressionLiteral<'a> {
@@ -33,25 +33,25 @@ impl<'a> ExpressionLiteral<'a> {
 fn expression_literal(input: Input) -> IResult<'_, ExpressionLiteral<'_>> {
     let u32_ = context(
         "U32 literal",
-        map(terminated(digit1, tag("u32")), |lit: Input| {
+        noerr(map(terminated(digit1, tag("u32")), |lit: Input| {
             ExpressionLiteral::U32(lit.parse().unwrap())
-        }),
+        })),
     );
 
     let sign = opt(ch_('-'));
     let signed = tuple((sign, multispace0, digit1));
     let signed = context("Integral literal", signed);
 
-    let integral_untyped = map(recognize(signed), |lit: Input| {
+    let integral_untyped = noerr(map(recognize(signed), |lit: Input| {
         ExpressionLiteral::Integral(lit.fragment())
-    });
+    }));
 
     let unit = context(
         "Unit literal",
-        value(
+        noerr(value(
             ExpressionLiteral::Unit,
             nom::sequence::delimited(ch_('('), multispace0, ch_(')')),
-        ),
+        )),
     );
 
     context("Literal", alt((u32_, integral_untyped, unit)))(input)
@@ -67,7 +67,7 @@ pub type ExprNode<'a> = Spanned<Expression<'a>>;
 pub fn expression(input: Input) -> IResult<ExprNode> {
     context(
         "Expression",
-        spanned(map(expression_literal, Expression::Literal)),
+        spanned(mape(expression_literal, Expression::Literal)),
     )(input)
 }
 
@@ -97,44 +97,49 @@ mod tests {
 
     #[test]
     fn parse_expression_literal_integral() {
-        let (tail, parsed) = expression("0".into()).unwrap();
+        let (tail, (parsed, err)) = expression("0".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
             Expression::Literal(ExpressionLiteral::Integral("0")).into()
         );
+        assert_eq!(err, vec![]);
 
-        let (tail, parsed) = expression("1357".into()).unwrap();
+        let (tail, (parsed, err)) = expression("1357".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
             Expression::Literal(ExpressionLiteral::Integral("1357")).into()
         );
+        assert_eq!(err, vec![]);
 
-        let (tail, parsed) = expression("-135234".into()).unwrap();
+        let (tail, (parsed, err)) = expression("-135234".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
             Expression::Literal(ExpressionLiteral::Integral("-135234")).into()
         );
+        assert_eq!(err, vec![]);
 
         expression("bar".into()).unwrap_err();
     }
 
     #[test]
     fn parse_expression_literal_unit() {
-        let (tail, parsed) = expression("()".into()).unwrap();
+        let (tail, (parsed, err)) = expression("()".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(parsed, Expression::Literal(ExpressionLiteral::Unit).into());
+        assert_eq!(err, vec![]);
     }
 
     #[test]
     fn parse_expression_literal_u32() {
-        let (tail, parsed) = expression("1234u32".into()).unwrap();
+        let (tail, (parsed, err)) = expression("1234u32".into()).unwrap();
         assert_eq!(*tail.fragment(), "");
         assert_eq!(
             parsed,
             Expression::Literal(ExpressionLiteral::U32(1234)).into()
         );
+        assert_eq!(err, []);
     }
 }
