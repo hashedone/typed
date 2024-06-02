@@ -42,6 +42,28 @@ fn create_report_unexpected<'a>(
         .finish()
 }
 
+fn create_report_lit_oo_range<'a>(
+    source_name: &'a str,
+    lit: Range<usize>,
+    ty: &'a str,
+) -> Report<'a, (&'a str, Range<usize>)> {
+    let config = ariadne::Config::default()
+        .with_label_attach(ariadne::LabelAttach::Start)
+        .with_tab_width(2);
+
+    let highlight = Color::Fixed(81);
+
+    Report::build(ReportKind::Error, source_name, lit.start)
+        .with_code(1)
+        .with_config(config)
+        .with_message("Literal out of range")
+        .with_label(Label::new((source_name, lit.clone())).with_message(format!(
+            "Literal out of range for {} type",
+            ty.fg(highlight)
+        )))
+        .finish()
+}
+
 fn create_report(source_name: &str, error: parser::error::Error) -> Report<(&str, Range<usize>)> {
     use parser::error::Error;
 
@@ -50,6 +72,14 @@ fn create_report(source_name: &str, error: parser::error::Error) -> Report<(&str
             error: ParseError::Unexpected { offset, context },
             recovery_point,
         } => create_report_unexpected(source_name, offset, context, recovery_point),
+        Error::Parse {
+            error:
+                ParseError::LiteralOutOfRange {
+                    literal,
+                    ty,
+                },
+            ..
+        } => create_report_lit_oo_range(source_name, literal, ty),
     }
 }
 

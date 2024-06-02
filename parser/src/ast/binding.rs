@@ -7,8 +7,9 @@ use nom::Parser;
 
 use super::expression::{expression, ExprNode};
 use super::spanned::{spanned, Spanned};
+use super::tuple::collect_err;
 use super::ty::{type_, TypeNode};
-use super::vis::{visibility, VisibilityNode};
+use super::vis::{visibility, Visibility, VisibilityNode};
 use super::{parse_id, Describe, IResult, Input};
 
 /// Binging in form of:
@@ -62,24 +63,15 @@ pub fn binding(input: Input) -> IResult<BindingNode> {
 
     spanned(map(
         tpl,
-        |(
-            (visibility, mut viserr),
-            _,
-            _let,
-            _,
-            (name, nameerr),
-            _,
-            ty_,
-            _,
-            _eq,
-            _,
-            (expression, exprerr),
-            _semi,
-        )| {
+        |(visibility, _, _let, _, name, _, ty_, _, _eq, _, expression, _semi)| {
             let (ty_, tyerr) = ty_.unzip();
-            viserr.extend(nameerr);
-            viserr.extend(tyerr.into_iter().flatten());
-            viserr.extend(exprerr);
+            let (visibility, name, _, expression, err) = collect_err((
+                visibility,
+                name,
+                ((), tyerr.unwrap_or_default()),
+                expression,
+            ));
+
             (
                 Binding {
                     visibility,
@@ -87,7 +79,7 @@ pub fn binding(input: Input) -> IResult<BindingNode> {
                     ty_,
                     expression,
                 },
-                viserr,
+                err,
             )
         },
     ))

@@ -1,4 +1,6 @@
-use nom::error::ContextError;
+use std::ops::Range;
+
+use nom::error::{ContextError, FromExternalError};
 use thiserror::Error;
 
 use crate::ast::Input;
@@ -14,6 +16,17 @@ pub enum ParseError {
         /// The name of last context parser
         context: &'static str,
     },
+    #[error("Literal out of range")]
+    LiteralOutOfRange {
+        literal: Range<usize>,
+        ty: &'static str,
+    },
+}
+
+impl<I> FromExternalError<I, ParseError> for ParseError {
+    fn from_external_error(_input: I, _kind: nom::error::ErrorKind, e: ParseError) -> Self {
+        e
+    }
 }
 
 impl<'a> nom::error::ParseError<Input<'a>> for ParseError {
@@ -56,8 +69,9 @@ impl<'a> ContextError<Input<'a>> for ParseError {
 }
 
 #[derive(Error, Debug, Clone, PartialEq)]
-#[error("{error}")]
 pub enum Error {
+    /// Error occured while parsing
+    #[error("{error}")]
     Parse {
         error: ParseError,
         recovery_point: usize,

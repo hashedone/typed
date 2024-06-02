@@ -10,6 +10,7 @@ pub mod expression;
 pub mod module;
 pub mod recover;
 pub mod spanned;
+pub mod tuple;
 pub mod ty;
 pub mod vis;
 

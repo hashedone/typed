@@ -39,7 +39,7 @@ where
     fn describe(&self, f: &mut W) -> std::io::Result<()> {
         match self {
             Self::Basic(ty_) => ty_.describe(f),
-            Self::Unit => write!(f, "UNIT"),
+            Self::Unit => write!(f, "UTYPE"),
         }
     }
 

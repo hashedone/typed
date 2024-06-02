@@ -1,9 +1,11 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{char as ch_, digit1, multispace0};
-use nom::combinator::{map, opt, recognize, value};
+use nom::combinator::{cut, map, map_res, opt, recognize, value};
 use nom::error::context;
 use nom::sequence::{terminated, tuple};
+
+use crate::error::ParseError;
 
 use super::spanned::{spanned, Spanned};
 use super::{mape, noerr, Describe, IResult, Input};
@@ -33,9 +35,19 @@ impl<'a> ExpressionLiteral<'a> {
 fn expression_literal(input: Input) -> IResult<'_, ExpressionLiteral<'_>> {
     let u32_ = context(
         "U32 literal",
-        noerr(map(terminated(digit1, tag("u32")), |lit: Input| {
-            ExpressionLiteral::U32(lit.parse().unwrap())
-        })),
+        map_res(
+            spanned(noerr(terminated(digit1, tag("u32")))),
+            |(lit, err)| {
+                let lit = lit.node.parse().map_err(|_| {
+                    ParseError::LiteralOutOfRange {
+                        literal: lit.span,
+                        ty: "u32",
+                    }
+                })?;
+                let lit = ExpressionLiteral::U32(lit);
+                Ok((lit, err))
+            },
+        ),
     );
 
     let sign = opt(ch_('-'));
