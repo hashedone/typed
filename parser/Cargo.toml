@@ -1,14 +1,8 @@
 [package]
-name = "parser"
+name = "typed-parser"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-ariadne = { version = "0.4.0", features = ["auto-color"] }
-derivative = "2.2.0"
-nom = "7.1.3"
-nom_locate = "4.2.0"
-thiserror = "1.0.58"
-
+chumsky = { version = "1.0.0-alpha.7", features = ["label"] }
+ariadne = "0.4"

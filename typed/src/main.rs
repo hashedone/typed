@@ -1,15 +1,15 @@
 use std::ops::Range;
 use std::path::PathBuf;
 
-use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
+use ariadne::{ColorGenerator, Fmt, Label, Report, ReportKind, Source};
 use clap::Parser;
 use color_eyre::Result;
 use eyre::Context;
+use itertools::Itertools;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-use parser::ast::Ast;
-use parser::error::ParseError;
+use typed_parser as parser;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -19,68 +19,35 @@ struct Args {
     input: PathBuf,
 }
 
-fn create_report_unexpected<'a>(
+fn create_report<'a>(
     source_name: &'a str,
-    offset: usize,
-    context: &'a str,
-    recovery_point: usize,
+    error: parser::Error,
 ) -> Report<'a, (&'a str, Range<usize>)> {
-    let config = ariadne::Config::default()
-        .with_label_attach(ariadne::LabelAttach::Start)
-        .with_tab_width(2);
+    let mut report = Report::build(ReportKind::Error, source_name, error.span().start)
+        .with_message("Parse error");
 
-    let highlight = Color::Fixed(81);
+    let mut colors = ColorGenerator::new();
+    let expected = error.expected();
 
-    Report::build(ReportKind::Error, source_name, offset)
-        .with_code(1)
-        .with_config(config)
-        .with_message("Unexpected token")
-        .with_label(
-            Label::new((source_name, offset..recovery_point))
-                .with_message(format!("While parsing {}", context.fg(highlight))),
-        )
-        .finish()
-}
+    if expected.len() > 0 {
+        let color = colors.next();
+        let label = Label::new((source_name, error.span().start..error.span().end));
 
-fn create_report_lit_oo_range<'a>(
-    source_name: &'a str,
-    lit: Range<usize>,
-    ty: &'a str,
-) -> Report<'a, (&'a str, Range<usize>)> {
-    let config = ariadne::Config::default()
-        .with_label_attach(ariadne::LabelAttach::Start)
-        .with_tab_width(2);
+        let label = match error.found() {
+            Some(found) => label.with_message(format!("Unexpected {}", found.fg(color))),
+            None => label.with_message(format!("Unexpected {}", "EOF".fg(color))),
+        };
 
-    let highlight = Color::Fixed(81);
+        let label = label.with_color(color);
 
-    Report::build(ReportKind::Error, source_name, lit.start)
-        .with_code(1)
-        .with_config(config)
-        .with_message("Literal out of range")
-        .with_label(Label::new((source_name, lit.clone())).with_message(format!(
-            "Literal out of range for {} type",
-            ty.fg(highlight)
-        )))
-        .finish()
-}
+        report = report.with_label(label);
 
-fn create_report(source_name: &str, error: parser::error::Error) -> Report<(&str, Range<usize>)> {
-    use parser::error::Error;
+        let expected = expected.map(|e| e.fg(color).to_string()).join(", ");
 
-    match error {
-        Error::Parse {
-            error: ParseError::Unexpected { offset, context },
-            recovery_point,
-        } => create_report_unexpected(source_name, offset, context, recovery_point),
-        Error::Parse {
-            error:
-                ParseError::LiteralOutOfRange {
-                    literal,
-                    ty,
-                },
-            ..
-        } => create_report_lit_oo_range(source_name, literal, ty),
+        report = report.with_note(format!("Expected one of: {}", expected));
     }
+
+    report.finish()
 }
 
 fn main() -> Result<()> {
@@ -95,13 +62,12 @@ fn main() -> Result<()> {
 
     let source = std::fs::read_to_string(&args.input).wrap_err("Reading input file")?;
 
-    let ast = Ast::parse(&source);
+    let module = parser::parse(&source);
 
-    ast.format(&mut std::io::stdout().lock())?;
-    println!();
+    println!("Module: {:#?}", module.output());
 
     let input_name = args.input.as_os_str().to_str().unwrap_or("");
-    for err in ast.errors {
+    for err in module.into_errors() {
         create_report(input_name, err).eprint((input_name, Source::from(&source)))?;
     }
 

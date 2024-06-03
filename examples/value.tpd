@@ -3,3 +3,4 @@ let other = 10;
 let unit: () = 15;
 let toobig = 100000000000000000000000u32;
 let bla = 16u32;
+let paren = (12);

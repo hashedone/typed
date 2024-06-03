@@ -1,3 +1,3 @@
 [workspace]
 resolver = "2"
-members = [ "aster", "parser","typed"]
+members = ["parser","typed"]
