@@ -35,16 +35,3 @@ fn spanned<'s, T>(
         span: extra.span().start()..extra.span().end(),
     })
 }
-
-/// Extra parser functions
-trait ParserEx<'s, T>: Parser<'s, &'s str, T, Ex<'s>> + Clone {
-    /// Parses a spanned node
-    fn spanned(self) -> impl Parser<'s, &'s str, Spanned<T>, Ex<'s>>
-    where
-        Self: Sized,
-    {
-        spanned(self)
-    }
-}
-
-impl<'s, T> ParserEx<'s, T> for T where T: Parser<'s, &'s str, T, Ex<'s>> + Clone + Sized {}

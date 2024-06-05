@@ -13,52 +13,40 @@ use crate::{spanned, Ex, Spanned};
 #[derive(Clone, Debug, PartialEq)]
 pub struct Binding<'s> {
     pub vis: Spanned<Vis>,
-    pub let_: Spanned<()>,
     pub ident: Spanned<&'s str>,
-    pub colon: Option<Spanned<()>>,
     pub ty: Option<Spanned<Ty>>,
-    pub eq: Spanned<()>,
     pub expr: Spanned<Expr<'s>>,
-    pub semi: Spanned<()>,
 }
 
 pub fn binding<'s>() -> impl Parser<'s, &'s str, Binding<'s>, Ex<'s>> + Clone {
     let vis = spanned(vis());
-    let let_ = spanned(just("let").to(()));
+    let let_ = just("let");
     let ident = spanned(ident());
-    let ty = spanned(just(":").to(()))
-        .then_ignore(whitespace())
-        .then(spanned(ty()))
+    let ty = just(":")
+        .then(whitespace())
+        .ignore_then(spanned(ty()))
         .or_not();
-    let eq = spanned(just("=").to(()));
+    let eq = just("=");
     let expr = spanned(expr());
-    let semi = spanned(just(";").to(()));
+    let semi = just(";");
 
     vis.then_ignore(whitespace())
-        .then(let_)
+        .then_ignore(let_)
         .then_ignore(whitespace())
         .then(ident)
         .then_ignore(whitespace())
         .then(ty)
         .then_ignore(whitespace())
-        .then(eq)
+        .then_ignore(eq)
         .then_ignore(whitespace())
         .then(expr)
         .then_ignore(whitespace())
-        .then(semi)
-        .map(|((((((vis, let_), ident), ty), eq), expr), semi)| {
-            let (colon, ty) = ty.unzip();
-
-            Binding {
-                vis,
-                let_,
-                ident,
-                colon,
-                ty,
-                eq,
-                expr,
-                semi,
-            }
+        .then_ignore(semi)
+        .map(|(((vis, ident), ty), expr)| Binding {
+            vis,
+            ident,
+            ty,
+            expr,
         })
 }
 
@@ -80,27 +68,14 @@ mod tests {
                     node: Vis::Public,
                     span: 0..3,
                 },
-                let_: Spanned {
-                    node: (),
-                    span: 4..7,
-                },
                 ident: Spanned {
                     node: "x",
                     span: 8..9,
                 },
-                colon: None,
                 ty: None,
-                eq: Spanned {
-                    node: (),
-                    span: 10..11,
-                },
                 expr: Spanned {
                     node: Expr::Literal(Literal::Integer("42")),
                     span: 12..14,
-                },
-                semi: Spanned {
-                    node: (),
-                    span: 14..15,
                 },
             }
         );
@@ -114,33 +89,17 @@ mod tests {
                     node: Vis::Private,
                     span: 0..0,
                 },
-                let_: Spanned {
-                    node: (),
-                    span: 0..3,
-                },
                 ident: Spanned {
                     node: "x",
                     span: 4..5,
                 },
-                colon: Some(Spanned {
-                    node: (),
-                    span: 5..6,
-                }),
                 ty: Some(Spanned {
                     node: Ty::Basic(BasicType::U32),
                     span: 7..10,
                 }),
-                eq: Spanned {
-                    node: (),
-                    span: 11..12,
-                },
                 expr: Spanned {
                     node: Expr::Literal(Literal::Integer("42")),
                     span: 13..15,
-                },
-                semi: Spanned {
-                    node: (),
-                    span: 15..16,
                 },
             }
         );

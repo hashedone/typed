@@ -49,27 +49,14 @@ mod tests {
                     node: crate::vis::Vis::Private,
                     span: 0..0,
                 },
-                let_: Spanned {
-                    node: (),
-                    span: 0..3,
-                },
                 ident: Spanned {
                     node: "x",
                     span: 4..5,
                 },
-                colon: None,
                 ty: None,
-                eq: Spanned {
-                    node: (),
-                    span: 6..7,
-                },
                 expr: Spanned {
                     node: crate::expr::Expr::Literal(crate::literal::Literal::Integer("42")),
                     span: 8..10,
-                },
-                semi: Spanned {
-                    node: (),
-                    span: 10..11,
                 },
             })
         );
@@ -83,33 +70,17 @@ mod tests {
                     node: crate::vis::Vis::Private,
                     span: 0..0,
                 },
-                let_: Spanned {
-                    node: (),
-                    span: 0..3,
-                },
                 ident: Spanned {
                     node: "x",
                     span: 4..5,
                 },
-                colon: Some(Spanned {
-                    node: (),
-                    span: 5..6,
-                }),
                 ty: Some(Spanned {
                     node: crate::ty::Ty::Basic(crate::ty::BasicType::U32),
                     span: 7..10,
                 }),
-                eq: Spanned {
-                    node: (),
-                    span: 11..12,
-                },
                 expr: Spanned {
                     node: crate::expr::Expr::Literal(crate::literal::Literal::Integer("42")),
                     span: 13..15,
-                },
-                semi: Spanned {
-                    node: (),
-                    span: 15..16,
                 },
             })
         );
