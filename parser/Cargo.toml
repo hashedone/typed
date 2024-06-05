@@ -5,4 +5,3 @@ edition = "2021"
 
 [dependencies]
 chumsky = { version = "1.0.0-alpha.7", features = ["label"] }
-ariadne = "0.4"

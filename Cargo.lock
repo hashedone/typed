@@ -769,7 +769,6 @@ dependencies = [
 name = "typed-parser"
 version = "0.1.0"
 dependencies = [
- "ariadne",
  "chumsky",
 ]
 
